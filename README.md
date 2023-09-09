@@ -34,6 +34,30 @@ The bridge contract is deployed on supported chains and has the following functi
 - Withdraw function to bridge back NFTs
 - Fee system based on single NFT contracts
 
+### Run Script
+
+To run scripts we use HardHat from Nomic Foundation. To install it, follow the instructions [here](https://hardhat.org/getting-started/#installation).
+or do `npm install` in the root folder
+
+To execute a script, run `npx hardhat run scripts/<script_name>.js --network <network_name>`
+
+If you want to dry-run your scripts (optionally forking a network configured in hardhat.config.js)
+You can simply do
+`npx hardhat run .\scripts\Bridge.js`
+
+### Run Tests
+
+To run tests we use Foundry from Paradigm. To install it, follow the instructions [here](https://book.getfoundry.sh/getting-started/installation)
+If you're using Windows you can download the binaries and add them to your PATH, without needing to install and compile the project.
+
+Install the required libraries and edit the foundry.toml remapping based on your local setup.
+```
+forge install foundry-rs/forge-std --no-commit
+forge install openzeppelin/openzeppelin-contracts --no-commit
+```
+
+To execute a test, run `forge test`
+
 ## user usage actions (contract related)
 
 1. User approves the bridge contract to transfer the NFTs

@@ -29,6 +29,7 @@ async function initScripts() {
     owner         = ethers.provider.getSigner(0)
     bridgeSigner  = ethers.provider.getSigner(1)
     bridgeOperatorSigner = ethers.provider.getSigner(2)
+    bridgeFeeReceiverSigner = ethers.provider.getSigner(3)
 
     // get addresses
     ownerAddress  = await owner.getAddress()
@@ -66,9 +67,9 @@ async function deployBasicERC20() {
     console.warn("---WARNING---")
     console.warn("This token is only for testing purposes, it is not meant to be used on mainnet.")
     console.log("deploying basic ERC20..")
-    let basicERC20 = await ethers.getContractFactory("base_erc20", owner);
-    
-    basicERC20 = await basicERC20.deploy()
+    const basicERC20 = await(
+        await ethers.getContractFactory("base_erc20", owner)
+        ).deploy();
     console.log("waiting for confirmation..")
     await basicERC20.deployed()
     console.log("✅Basic ERC20 deployed to:", basicERC20.address)
