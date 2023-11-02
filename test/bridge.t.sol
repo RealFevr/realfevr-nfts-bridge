@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import { base_erc20, IERC20 } from "../contracts/base_erc20.sol";
 import { base_erc721 } from "../contracts/base_erc721.sol";
 import { ERC721Bridge } from "../contracts/ERC721Bridge.sol";
+import { DeployAllAndSetBridge } from "../scripts/Bridge.s.sol";
 
 contract ERC721BridgeTest is Test {
     address public deployer      = 0x3FD83f3a9aeb9C9276dE8BDBCBd04a63D739324D;
@@ -25,10 +26,13 @@ contract ERC721BridgeTest is Test {
     uint public chain_B;
     uint public depositFee = 1 ether;
     uint public withdrawFee = 0;
+    uint public ethDepositFee;
 
     event NFTDeposited(address indexed contractAddress, address owner, uint256 tokenId, uint256 fee);
     event NFTUnlocked(address indexed contractAddress, address owner, uint256 tokenId);
     event NFTWithdrawn(address indexed contractAddress, address owner, uint256 tokenId, uint256 fee);
+    event TokenFeeCollected(address indexed tokenAddress, uint amount);
+    event ETHFeeCollected(uint amount);
     
     
     function setUp() public {
@@ -63,9 +67,9 @@ contract ERC721BridgeTest is Test {
                 );
             // deploy bridge
                 bridge = new ERC721Bridge({
-                    bridgeSigner_: bridgeSigner,
-                    feeReceiver_: feeReceiver,
-                    operator_: deployer
+                    _bridgeSigner: bridgeSigner,
+                    _feeReceiver: feeReceiver,
+                    _operator: deployer
                 });
             // configure bridge
                 bridge.setNFTDetails({
@@ -76,6 +80,10 @@ contract ERC721BridgeTest is Test {
                     withdrawFeeAmount: withdrawFee
                 });
                 bridge.setFeeStatus(true);
+                bridge.setETHFee({
+                    status: true,
+                    amount: 0.0002 ether
+                });
                 bridge.setBridgeStatus(true);
                 bridge.setERC20Details({
                     isActive: true,
@@ -102,6 +110,8 @@ contract ERC721BridgeTest is Test {
             vm.label(address(bridge),       "bridge");
             vm.label(address(this),         "TestContract");
 
+            // set gvars
+            ethDepositFee = bridge.ethDepositFee();
             // exit deployer
             vm.stopPrank();
         }
@@ -150,7 +160,7 @@ contract ERC721BridgeTest is Test {
             // deposit NFT
             vm.expectEmit(address(bridge));
             emit NFTDeposited(address(nftToken), users[i], nftId, fee);
-            bridge.depositSingleERC721(address(nftToken), nftId);
+            bridge.depositSingleERC721{value: ethDepositFee}(address(nftToken), nftId);
             assertEq(nftToken.ownerOf(nftId), address(bridge));
             // exit user
             vm.stopPrank();
@@ -181,7 +191,6 @@ contract ERC721BridgeTest is Test {
 
     function test_setBridgeStatus() public {
         // setBridgeStatus - false = nobody can deposit or withdraw
-
         assertEq(bridge.isOnline(), true);
         vm.expectRevert();
         bridge.setBridgeStatus(false);
@@ -193,11 +202,11 @@ contract ERC721BridgeTest is Test {
         vm.expectRevert(ERC721Bridge.BridgeIsPaused.selector);
         // try all the actions, all must fail
 
-        bridge.depositSingleERC721(address(nftToken), 1);
+        bridge.depositSingleERC721{value: ethDepositFee}(address(nftToken), 1);
         uint[] memory ids = new uint[](1);
         ids[0] = 1;
         vm.expectRevert(ERC721Bridge.BridgeIsPaused.selector);
-        bridge.depositMultipleERC721(address(feeToken),address(nftToken), ids);
+        bridge.depositMultipleERC721{value: ethDepositFee*ids.length}(address(feeToken),address(nftToken), ids);
     }
 
     function test_setFeeStatus() public {
@@ -214,6 +223,7 @@ contract ERC721BridgeTest is Test {
         userNFTs[0] = 0;
         userNFTs[1] = 3;
         assertEq(bridge.feeActive(), false);
+        vm.stopPrank();
     // user1 can deposit without paying ERC20
         vm.prank(user1);
         nftToken.setApprovalForAll(address(bridge), true);
@@ -221,14 +231,14 @@ contract ERC721BridgeTest is Test {
         uint snapshot = vm.snapshot(); // (. ❛ ᴗ ❛.)
 
         vm.prank(user1);
-        bridge.depositSingleERC721(address(nftToken), 0);
+        bridge.depositSingleERC721{value: ethDepositFee}(address(nftToken), 0);
 
         vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
         vm.prank(user1);
         vm.expectEmit(address(bridge));
         emit NFTDeposited(address(nftToken), user1, userNFTs[0], 0);
         emit NFTDeposited(address(nftToken), user1, userNFTs[1], 0);
-        bridge.depositMultipleERC721(address(nftToken), address(feeToken), userNFTs);
+        bridge.depositMultipleERC721{value: ethDepositFee*userNFTs.length}(address(nftToken), address(feeToken), userNFTs);
 
         // check NFT info
         (bool canBeWithdrawn, address owner) = bridge.nftListPerContract(address(nftToken), 0);
@@ -249,7 +259,7 @@ contract ERC721BridgeTest is Test {
     // user1 cannot deposit without approving ERC20
         vm.prank(user1);//🟢
         vm.expectRevert(abi.encodeWithSelector(ERC721Bridge.FeeTokenNotApproved.selector, address(feeToken), depositFee));
-        bridge.depositSingleERC721(address(nftToken), 0);
+        bridge.depositSingleERC721{value: ethDepositFee}(address(nftToken), 0);
 
         vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
 
@@ -257,20 +267,20 @@ contract ERC721BridgeTest is Test {
         vm.startPrank(user1);
         feeToken.transfer(address(bridge), feeToken.balanceOf(user1));
         vm.expectRevert(ERC721Bridge.FeeTokenInsufficentBalance.selector);
-        bridge.depositSingleERC721(address(nftToken), 0);
+        bridge.depositSingleERC721{value: ethDepositFee}(address(nftToken), 0);
 
         vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
     // user1 cannot deposit without NFT
         nftToken.transferFrom(user1, address(bridge), 0);
         vm.expectRevert(ERC721Bridge.NFTNotOwnedByYou.selector);
-        bridge.depositSingleERC721(address(nftToken), 0);
+        bridge.depositSingleERC721{value: ethDepositFee}(address(nftToken), 0);
 
         vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
 
     // user1 cannot deposit a random NFT address
         address randomAddress = address(892);
         vm.expectRevert(ERC721Bridge.NFTContractNotActive.selector);
-        bridge.depositSingleERC721(randomAddress, 0);
+        bridge.depositSingleERC721{value: ethDepositFee}(randomAddress, 0);
 
         vm.stopPrank();//🔴
     // user1 cannot use an ERC20 not configured by operator
@@ -284,7 +294,7 @@ contract ERC721BridgeTest is Test {
         });
         vm.prank(user1);
         vm.expectRevert(ERC721Bridge.ERC20ContractNotActive.selector);
-        bridge.depositSingleERC721(address(nftToken), 0);
+        bridge.depositSingleERC721{value: ethDepositFee}(address(nftToken), 0);
 
         vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
 
@@ -296,7 +306,7 @@ contract ERC721BridgeTest is Test {
         });
         vm.prank(user1);
         vm.expectRevert(ERC721Bridge.ERC20ContractNotActive.selector);
-        bridge.depositSingleERC721(address(nftToken), 0);
+        bridge.depositSingleERC721{value: ethDepositFee}(address(nftToken), 0);
 
         vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
 
@@ -311,7 +321,7 @@ contract ERC721BridgeTest is Test {
         });
         vm.prank(user1);
         vm.expectRevert(ERC721Bridge.NFTContractNotActive.selector);
-        bridge.depositSingleERC721(address(nftToken), 0);
+        bridge.depositSingleERC721{value: ethDepositFee}(address(nftToken), 0);
 
         vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
 
@@ -321,7 +331,7 @@ contract ERC721BridgeTest is Test {
 
         vm.expectEmit(address(bridge));
         emit NFTDeposited(address(nftToken), user1, 0, depositFee);
-        bridge.depositSingleERC721(address(nftToken), 0);
+        bridge.depositSingleERC721{value: ethDepositFee}(address(nftToken), 0);
 
         assertEq(nftToken.ownerOf(0), address(bridge));
         assertEq(feeToken.balanceOf(feeReceiver), depositFee);
@@ -339,7 +349,7 @@ contract ERC721BridgeTest is Test {
         vm.expectEmit(address(bridge));
         emit NFTDeposited(address(nftToken), user1, userNFTs[0], depositFee);
         emit NFTDeposited(address(nftToken), user1, userNFTs[1], depositFee);
-        bridge.depositMultipleERC721(address(nftToken), address(feeToken), userNFTs);
+        bridge.depositMultipleERC721{value: ethDepositFee*userNFTs.length}(address(nftToken), address(feeToken), userNFTs);
         
         assertEq(feeToken.balanceOf(feeReceiver), depositFee*2);
 
@@ -352,7 +362,7 @@ contract ERC721BridgeTest is Test {
         vm.startPrank(user1);//🟢
         feeToken.approve(address(bridge), type(uint).max);
         nftToken.setApprovalForAll(address(bridge), true);
-        bridge.depositSingleERC721(address(nftToken), 0);
+        bridge.depositSingleERC721{value: ethDepositFee}(address(nftToken), 0);
         vm.stopPrank();//🔴
 
         // bridge signer unlock the NFTs
@@ -398,8 +408,8 @@ contract ERC721BridgeTest is Test {
         vm.expectRevert(ERC721Bridge.NFTNotUnlocked.selector);
         bridge.withdrawSingleERC721(address(nftToken), 0);
         
-        vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
         vm.stopPrank();
+        vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
     // user1 cannot withdraw if the bridge is disabled
         vm.prank(deployer);
         bridge.setBridgeStatus(false);
@@ -413,14 +423,14 @@ contract ERC721BridgeTest is Test {
         bridge.withdrawSingleERC721(address(nftToken), 0);
 
     // user1 can withdraw multiple NFTs
-        vm.startPrank(deployer);
+        vm.prank(deployer);
         nftToken.safeMint(user1);
         uint[] memory userNFTs = new uint[](2);
         userNFTs[0] = 0;
         userNFTs[1] = 3;
 
         vm.prank(user1);
-        bridge.depositSingleERC721(address(nftToken), 3);
+        bridge.depositSingleERC721{value: ethDepositFee}(address(nftToken), 3);
 
         vm.prank(bridgeSigner);
         bridge.setPermissionToWithdraw({
@@ -433,7 +443,8 @@ contract ERC721BridgeTest is Test {
         vm.startPrank(user2);
         feeToken.approve(address(bridge), type(uint).max);
         nftToken.setApprovalForAll(address(bridge), true);
-        bridge.depositSingleERC721(address(nftToken), 1);
+        bridge.depositSingleERC721{value: ethDepositFee}(address(nftToken), 1);
+        vm.stopPrank();
 
         vm.prank(bridgeSigner);
         bridge.setPermissionToWithdraw({
@@ -463,6 +474,9 @@ contract ERC721BridgeTest is Test {
         vm.expectRevert(ERC721Bridge.NFTNotUnlocked.selector);
         bridge.withdrawMultipleERC721(address(nftToken), userNFTs);
 
+        // user cannot withdraw an NFT that is not whitelisted
+        vm.expectRevert(ERC721Bridge.NFTContractNotActive.selector);
+        bridge.withdrawMultipleERC721(address(feeToken), userNFTs);
 
         vm.stopPrank();
 
@@ -502,7 +516,7 @@ contract ERC721BridgeTest is Test {
         nftToken.setApprovalForAll(address(bridge), true);
 
         vm.expectRevert(abi.encodeWithSelector(ERC721Bridge.TooManyNFTsToDeposit.selector, 5));
-        bridge.depositMultipleERC721(address(nftToken), address(feeToken), userNFTsBad);
+        bridge.depositMultipleERC721{value: ethDepositFee*userNFTsBad.length}(address(nftToken), address(feeToken), userNFTsBad);
 
         uint snapshot = vm.snapshot(); // (. ❛ ᴗ ❛.)
         vm.stopPrank();
@@ -517,7 +531,7 @@ contract ERC721BridgeTest is Test {
         });
         vm.expectRevert(abi.encodeWithSelector(ERC721Bridge.NFTContractNotActive.selector));
         vm.prank(user1);
-        bridge.depositMultipleERC721(address(nftToken), address(feeToken), userNFTs);
+        bridge.depositMultipleERC721{value: ethDepositFee*userNFTs.length}(address(nftToken), address(feeToken), userNFTs);
         vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
 
         // ERC20 token must be allowed to use bridge
@@ -528,12 +542,12 @@ contract ERC721BridgeTest is Test {
         });
         vm.expectRevert(abi.encodeWithSelector(ERC721Bridge.ERC20ContractNotActive.selector));
         vm.startPrank(user1);
-        bridge.depositMultipleERC721(address(nftToken), address(feeToken), userNFTs);
+        bridge.depositMultipleERC721{value: ethDepositFee*userNFTs.length}(address(nftToken), address(feeToken), userNFTs);
         vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
 
         // cannot deposit 0 NFTs
         vm.expectRevert(abi.encodeWithSelector(ERC721Bridge.NoNFTsToDeposit.selector));
-        bridge.depositMultipleERC721(address(nftToken), address(feeToken), new uint[](0));
+        bridge.depositMultipleERC721{value: ethDepositFee*0}(address(nftToken), address(feeToken), new uint[](0));
 
         vm.expectEmit(address(bridge));
         emit NFTDeposited(address(nftToken), user1, userNFTs[0], depositFee);
@@ -541,7 +555,7 @@ contract ERC721BridgeTest is Test {
         emit NFTDeposited(address(nftToken), user1, userNFTs[2], depositFee);
         emit NFTDeposited(address(nftToken), user1, userNFTs[3], depositFee);
         emit NFTDeposited(address(nftToken), user1, userNFTs[4], depositFee);
-        bridge.depositMultipleERC721(address(nftToken), address(feeToken), userNFTs);
+        bridge.depositMultipleERC721{value: ethDepositFee*userNFTs.length}(address(nftToken), address(feeToken), userNFTs);
 
     }
 
@@ -582,7 +596,7 @@ contract ERC721BridgeTest is Test {
         nftToken.setApprovalForAll(address(bridge), true);
         vm.expectEmit(address(bridge));
         emit NFTDeposited(address(nftToken), user1, 0, _depositFee);
-        bridge.depositSingleERC721(address(nftToken), 0);
+        bridge.depositSingleERC721{value: ethDepositFee}(address(nftToken), 0);
 
         assertEq(feeToken.balanceOf(feeReceiver), _depositFee);
         assertEq(feeToken.balanceOf(user1), _withdrawFee);
@@ -774,7 +788,8 @@ contract ERC721BridgeTest is Test {
         userTokens[0] = 0;
         userTokens[1] = 1;
         vm.expectRevert(ERC721Bridge.FeeTokenInsufficentBalance.selector);
-        bridge.depositMultipleERC721(address(nftToken2), address(feeToken2), userTokens);
+        bridge.depositMultipleERC721{value: ethDepositFee*userTokens.length}(address(nftToken2), address(feeToken2), userTokens);
+        vm.stopPrank();
         vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
 
         //test2: user will hit FeeTokenNotApproved
@@ -788,7 +803,7 @@ contract ERC721BridgeTest is Test {
         nftToken2.setApprovalForAll(address(bridge), true);
         nftToken3.setApprovalForAll(address(bridge), true);
         vm.expectRevert(abi.encodeWithSelector(ERC721Bridge.FeeTokenNotApproved.selector, address(feeToken2), depositFee*2));
-        bridge.depositMultipleERC721(address(nftToken2), address(feeToken2), userTokens);
+        bridge.depositMultipleERC721{value: ethDepositFee*userTokens.length}(address(nftToken2), address(feeToken2), userTokens);
 
         vm.stopPrank();
         vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
@@ -805,7 +820,7 @@ contract ERC721BridgeTest is Test {
         vm.startPrank(user1);
         nftToken2.setApprovalForAll(address(bridge), true);
         feeToken2.approve(address(bridge), type(uint).max);
-        bridge.depositMultipleERC721(address(nftToken2), address(feeToken2), userTokens);
+        bridge.depositMultipleERC721{value: ethDepositFee*userTokens.length}(address(nftToken2), address(feeToken2), userTokens);
 
         vm.stopPrank();
         vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
@@ -825,6 +840,177 @@ contract ERC721BridgeTest is Test {
         vm.startPrank(user1);
         nftToken2.setApprovalForAll(address(bridge), true);
         feeToken2.approve(address(bridge), type(uint).max);
-        bridge.depositMultipleERC721(address(nftToken2), address(feeToken2), userTokens);
+        bridge.depositMultipleERC721{value: ethDepositFee*userTokens.length}(address(nftToken2), address(feeToken2), userTokens);
+    }
+
+    function test_eth_fee() public {
+    // user1 cannot deposit without paying the ETH fee
+        vm.prank(user1);
+        vm.expectRevert(abi.encodePacked(ERC721Bridge.InsufficentETHAmountForFee.selector, ethDepositFee));
+        bridge.depositSingleERC721{value: 0}(address(nftToken), 0);
+    
+    // user1 cannot deposit with a wrong ETH fee
+        // lower
+        vm.prank(user1);
+        vm.expectRevert(abi.encodePacked(ERC721Bridge.InsufficentETHAmountForFee.selector, ethDepositFee));
+        bridge.depositSingleERC721{value: ethDepositFee/2}(address(nftToken), 0);
+        // higher
+        vm.prank(user1);
+        vm.expectRevert(abi.encodePacked(ERC721Bridge.InsufficentETHAmountForFee.selector, ethDepositFee));
+        bridge.depositSingleERC721{value: ethDepositFee*2}(address(nftToken), 0);
+
+    // increase fee to 0.001 ETH
+        vm.prank(deployer);
+        ethDepositFee = 0.001 ether;
+        bridge.setETHFee(true, ethDepositFee);
+
+    // user1 cannot multiple deposit without paying the ETH fee
+        vm.prank(deployer);
+        nftToken.safeMint(user1);
+        uint[] memory userNFTs = new uint[](2);
+        userNFTs[0] = 0;
+        userNFTs[1] = 3;
+
+        vm.startPrank(user1);
+        // approve feeToken and NFTs
+        feeToken.approve(address(bridge), type(uint).max);
+        nftToken.setApprovalForAll(address(bridge), true);
+
+        vm.expectRevert(abi.encodePacked(ERC721Bridge.InsufficentETHAmountForFee.selector, ethDepositFee*userNFTs.length));
+        bridge.depositMultipleERC721{value: 0}(address(nftToken), address(feeToken), userNFTs);
+
+    // user1 cannot multiple deposit with a wrong ETH fee
+        // lower
+        vm.expectRevert(abi.encodePacked(ERC721Bridge.InsufficentETHAmountForFee.selector, ethDepositFee*userNFTs.length));
+        bridge.depositMultipleERC721{value: ethDepositFee*userNFTs.length/2}(address(nftToken), address(feeToken), userNFTs);
+        // higher
+        vm.expectRevert(abi.encodePacked(ERC721Bridge.InsufficentETHAmountForFee.selector, ethDepositFee*userNFTs.length));
+        bridge.depositMultipleERC721{value: ethDepositFee*userNFTs.length*2}(address(nftToken), address(feeToken), userNFTs);
+
+    // disable fees
+        vm.stopPrank();
+        vm.prank(deployer);
+        bridge.setETHFee(false, ethDepositFee);
+        
+        uint snapshot = vm.snapshot(); // (. ❛ ᴗ ❛.)
+
+        vm.startPrank(user1);
+        bridge.depositSingleERC721{value: 0}(address(nftToken), 0);
+        vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
+        bridge.depositMultipleERC721{value: 0}(address(nftToken), address(feeToken), userNFTs);
+        vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
+
+    // enable fees but set 0 amount
+        vm.stopPrank();
+        vm.prank(deployer);
+        bridge.setETHFee(true, 0);
+
+        snapshot = vm.snapshot(); // (. ❛ ᴗ ❛.)
+
+        vm.startPrank(user1);
+        bridge.depositSingleERC721{value: 0}(address(nftToken), 0);
+        vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
+        bridge.depositMultipleERC721{value: 0}(address(nftToken), address(feeToken), userNFTs);
+        vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
+    }
+
+    function test_multiple_withdraw_fee() public {
+        // mint nft to user
+        vm.prank(deployer);
+        nftToken.safeMint(user1);
+
+        // set 1 token as fee
+        vm.prank(deployer);
+        bridge.setTokenFees({
+            active: true,
+            nftAddress: address(nftToken),
+            depositFee: 1 ether,
+            withdrawFee: 1 ether
+        });
+        withdrawFee = 1 ether;
+
+        // create nft list
+        uint[] memory userNFTs = new uint[](2);
+        userNFTs[0] = 0;
+        userNFTs[1] = 3;
+
+        vm.startPrank(user1);
+
+        // aprove fee token and NFTs
+        feeToken.approve(address(bridge), type(uint).max);
+        nftToken.setApprovalForAll(address(bridge), true);
+
+        uint totalTokenFee = depositFee*userNFTs.length;
+        uint totalEthFee = ethDepositFee*userNFTs.length;
+
+        uint userTokenBalance      = feeToken.balanceOf(user1);
+        uint userNFTBalance        = nftToken.balanceOf(user1);
+        uint feeReceiverEthBalance = feeReceiver.balance;
+
+        vm.expectEmit(address(bridge));
+        emit NFTDeposited(address(nftToken), user1, userNFTs[0], depositFee);
+        emit NFTDeposited(address(nftToken), user1, userNFTs[1], depositFee);
+        emit TokenFeeCollected(address(feeToken), totalTokenFee);
+        emit ETHFeeCollected(totalEthFee);
+        bridge.depositMultipleERC721{value: ethDepositFee*userNFTs.length}(address(nftToken), address(feeToken), userNFTs);
+
+        assertEq(feeToken.balanceOf(user1), userTokenBalance - totalTokenFee);
+        assertEq(nftToken.balanceOf(user1), userNFTBalance - userNFTs.length);
+        assertEq(feeReceiver.balance, feeReceiverEthBalance + totalEthFee);
+
+        // set permission to withdraw
+        vm.stopPrank();
+        address[] memory userNFTsAddresses = new address[](2);
+        userNFTsAddresses[0] = user1;
+        userNFTsAddresses[1] = user1;
+
+        vm.prank(bridgeSigner);
+        bridge.setMultiplePermissionsToWithdraw({
+            contractAddress: address(nftToken),
+            owners: userNFTsAddresses,
+            tokenIds: userNFTs
+        });
+
+        vm.startPrank(user1);
+
+        userTokenBalance      = feeToken.balanceOf(user1);
+        userNFTBalance        = nftToken.balanceOf(user1);
+
+        //emit TokenFeeCollected(address(feeToken), totalTokenFee);
+
+        // if we pass an empty array the call should revert
+        uint[] memory emptyArray = new uint[](0);
+        vm.expectRevert(ERC721Bridge.NoNFTsToWithdraw.selector);
+        bridge.withdrawMultipleERC721(address(nftToken), emptyArray);
+
+        // if we pass an array too big the call should revert
+        uint[] memory bigArray = new uint[](51);
+        vm.expectRevert(abi.encodePacked(ERC721Bridge.TooManyNFTsToWithdraw.selector, uint(50)));
+        bridge.withdrawMultipleERC721(address(nftToken), bigArray);
+
+        // snapshot
+        uint snapshot = vm.snapshot(); // (. ❛ ᴗ ❛.)
+        vm.stopPrank();
+        vm.prank(deployer);
+        // disable bridge
+        bridge.setBridgeStatus(false);
+        vm.prank(user1);
+        vm.expectRevert(ERC721Bridge.BridgeIsPaused.selector);
+        bridge.withdrawMultipleERC721(address(nftToken), userNFTs);
+        vm.revertTo(snapshot); // ᕦ(ò_óˇ)ᕤ
+        
+        // withdraw multiple NFTs
+        vm.expectEmit(address(bridge));
+        emit NFTWithdrawn(address(nftToken), user1, userNFTs[0], withdrawFee);
+        emit NFTWithdrawn(address(nftToken), user1, userNFTs[1], withdrawFee);
+
+        vm.prank(user1);
+        bridge.withdrawMultipleERC721(address(nftToken), userNFTs);
+
+    }
+
+    function test_Bridge_script() external {
+        DeployAllAndSetBridge script = new DeployAllAndSetBridge();
+        script.run();
     }
 }

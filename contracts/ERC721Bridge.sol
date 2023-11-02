@@ -20,8 +20,10 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
 
     bool public isOnline;
     bool public feeActive;
+    bool public ethFeeActive;
     address public feeReceiver;
     uint public maxNFTsPerTx = 50;
+    uint public ethDepositFee;
 
     mapping(address => NFTContracts) public permittedNFTs;
     mapping(address => ERC20Tokens) public permittedERC20s;
@@ -46,23 +48,25 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
 
     /**
      * @notice constructor will set the roles and the bridge fee
-     * @param bridgeSigner_ address of the signer of the bridge
-     * @param feeReceiver_ address of the fee receiver
-     * @param operator_ address of the operator
+     * @param _bridgeSigner address of the signer of the bridge
+     * @param _feeReceiver address of the fee receiver
+     * @param _operator address of the operator
      */
-    constructor(address bridgeSigner_, address feeReceiver_, address operator_) {
+    constructor(address _bridgeSigner, address _feeReceiver, address _operator) {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(OPERATOR, operator_);
-        _setupRole(BRIDGE, bridgeSigner_);
-        feeReceiver = feeReceiver_;
+        _setupRole(OPERATOR, _operator);
+        _setupRole(BRIDGE, _bridgeSigner);
+        feeReceiver = _feeReceiver;
     }
 
     // bridge
     error BridgeIsPaused();
     error InvalidMaxNFTsPerTx();
+    error ETHTransferError();
     // fees
     error FeeTokenNotApproved(address tokenToApprove, uint amount);
     error FeeTokenInsufficentBalance();
+    error InsufficentETHAmountForFee(uint ethRequired);
     // nft
     error NFTNotOwnedByYou();
     error NoNFTsToDeposit();
@@ -81,6 +85,9 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
     // fees
     event FeesSet(bool active, address indexed nftAddress, address indexed tokenAddress, uint depositFee, uint withdrawFee);
     event FeeReceiverSet(address receiver);
+    event ETHFeeSet(bool active, uint amount);
+    event TokenFeeCollected(address indexed tokenAddress, uint amount);
+    event ETHFeeCollected(uint amount);
     // nft
     event NFTDeposited(address indexed contractAddress, address owner, uint256 tokenId, uint256 fee);
     event NFTWithdrawn(address indexed contractAddress, address owner, uint256 tokenId, uint fee);
@@ -121,6 +128,18 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
     function setFeeStatus(bool active) external onlyRole(OPERATOR) {
         feeActive = active;
         emit BridgeFeesPaused(active);
+    }
+
+    /**
+     * @notice set the ETH fee status
+     * @dev only operator can call this
+     * @param status bool to activate or deactivate the fees
+     * @param amount uint to set the fee amount
+     */
+    function setETHFee(bool status, uint amount) external onlyRole(OPERATOR) {
+        ethFeeActive = status;
+        ethDepositFee = amount;
+        emit ETHFeeSet(status, amount);
     }
 
     /**
@@ -208,7 +227,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
      * @param nftAddress address of the NFT contract
      * @param tokenId uint of the NFT id
      */
-    function depositSingleERC721(address nftAddress, uint tokenId) external nonReentrant {
+    function depositSingleERC721(address nftAddress, uint tokenId) external payable nonReentrant {
         // storage to access NFT Contract, NFT and erc20 details
         NFTContracts storage nftContract = permittedNFTs[nftAddress];
         NFT storage nft = nftListPerContract[nftAddress][tokenId];
@@ -222,7 +241,15 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
         if (!erc20Token.isActive) revert ERC20ContractNotActive();
         // NFT must be owned by msg.sender - @audit can be removed for gas opt
         if(IERC721(nftAddress).ownerOf(tokenId) != msg.sender) revert NFTNotOwnedByYou();
-        // check if user has enough tokens to pay for the bridge
+        // check if fees are active and > 0
+        if (ethFeeActive && ethDepositFee > 0) {
+            // check if user has enough ETH to pay for the bridge
+            if(msg.value != ethDepositFee) revert InsufficentETHAmountForFee(ethDepositFee);
+            // send ETH fee to feeReceiver
+            (bool success,) = feeReceiver.call{value: msg.value}("");
+            emit ETHFeeCollected(msg.value);
+            if (!success) revert ETHTransferError();
+        }
 
         uint bridgeCost;
         uint feeAmount = nftContract.feeDepositAmount;
@@ -249,7 +276,8 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
      * @param tokenAddress address of the ERC20 token to pay the fee
      * @param tokenIds uint[] of the NFT ids
      */
-    function depositMultipleERC721(address nftAddress, address tokenAddress, uint[] memory tokenIds) external nonReentrant {
+    function depositMultipleERC721(address nftAddress, address tokenAddress, uint[] memory tokenIds) external payable nonReentrant {
+        uint nftQuantity = tokenIds.length;
         // storage to access NFT Contract, NFT and erc20 details
         NFTContracts storage nftContract = permittedNFTs[nftAddress];
         ERC20Tokens storage erc20Token = permittedERC20s[tokenAddress];
@@ -260,13 +288,24 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
         if (!nftContract.isActive) revert NFTContractNotActive();
         // ERC20 token must be allowed to use bridge
         if (!erc20Token.isActive) revert ERC20ContractNotActive();
-
-        uint nftQuantity = tokenIds.length;
+        // check if fees are active and > 0
+        if(ethFeeActive && ethDepositFee > 0) {
+            // check if user has enough ERC20 to pay for the bridge
+            if(msg.value != ethDepositFee * nftQuantity) revert InsufficentETHAmountForFee(ethDepositFee * nftQuantity);
+            // send ETH fee to feeReceiver
+            (bool success,) = feeReceiver.call{value: msg.value}("");
+            emit ETHFeeCollected(msg.value);
+            if (!success) revert ETHTransferError();
+        }
+        // user should deposit at least 1 NFT
         if(nftQuantity == 0) revert NoNFTsToDeposit();
+        // user should deposit less than the max amount of NFTs per tx
         if(nftQuantity > maxNFTsPerTx) revert TooManyNFTsToDeposit(maxNFTsPerTx);
+
         uint bridgeCost;
         uint fees = nftContract.feeDepositAmount;
         address feeTokenAddress = nftContract.feeTokenAddress;
+
         // if Fees are active, we add the fee to the bridge cost
         if (feeActive && fees != 0) {
             bridgeCost = fees * nftQuantity;
@@ -349,7 +388,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
         // bridge must be active
         if(!isOnline) revert BridgeIsPaused();
         // NFT contract must be allowed to use bridge
-        require(nftContract.isActive, "NFT contract not permitted");
+        if(!nftContract.isActive) revert NFTContractNotActive();
 
         uint nftQuantity = tokenIds.length;
         if(nftQuantity == 0) revert NoNFTsToWithdraw();
@@ -382,7 +421,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
     }
 
     /**
-     * @notice withdraw ERC20 tokens from the bridge
+     * @notice take fees from the user
      * @param feeTokenAddress address of the token to take fees in
      * @param fees amount of fees to take
      * @param quantity number of NFTs to bridge
@@ -397,6 +436,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
             revert FeeTokenNotApproved(feeTokenAddress, bridgeCost);
         }
         bool success = IERC20(feeTokenAddress).transferFrom(msg.sender, feeReceiver, bridgeCost);
+        emit TokenFeeCollected(feeTokenAddress, bridgeCost);
         if (!success) {
             revert ERC20TransferError();
         }

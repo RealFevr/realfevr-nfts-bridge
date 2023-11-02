@@ -2,6 +2,10 @@
 pragma solidity ^0.8.13;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+/**
+ * @title  base_erc20
+ * @notice DO NOT USE THIS CONTRACT IN PRODUCTION. This is a contract for testing purposes only.
+ */
 contract base_erc20 is ERC20, Ownable {
     constructor() ERC20("BAZE", "BAZ") {
 
