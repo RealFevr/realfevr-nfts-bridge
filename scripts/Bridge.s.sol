@@ -115,6 +115,8 @@ contract DeployAllAndSetBridge is Base {
 
     // console log the addresses
         console.log("-----------------------");
+        console.log("Deployer address: ", deployerAddress);
+        console.log("Operator address: ", operatorAddress);
         console.log("Deployement addresses:");
         console.log("token: ",   address(token));
         console.log("nft: ",     address(nft));
@@ -126,5 +128,25 @@ contract DeployAllAndSetBridge is Base {
 contract DeployBridge is Base {
     function run() external {
         deployBridge();
+    }
+}
+
+contract DepositInBridge is Base {
+    function run() external {
+        ERC20 _token    = ERC20  (0x1Ed8922AFCd1779db88d35AE0A626Ee895Bfac90);
+        ERC721 _nft     = ERC721 (0x425279c23657F5Fb59375258aE911d5B6C9edE45);
+        ERC721Bridge _bridge = ERC721Bridge(0x0B6fd1C8E5186856E8D0775674C3952D7e46e7bc);
+        uint ethDepositFee = _bridge.ethDepositFee();
+
+        vm.startBroadcast(deployerPKey);
+        // approve both tokens and ERC721
+        _token.approve(address(_bridge), 1e30);
+        _nft.setApprovalForAll(address(_bridge), true);
+
+        // mint an nft
+        _nft.safeMint(deployerAddress);
+
+        // deposit the nft
+        bridge.depositSingleERC721{value: ethDepositFee}(address(_nft), 0);
     }
 }
