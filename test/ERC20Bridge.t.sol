@@ -2,7 +2,7 @@
 pragma solidity 0.8.23;
 import "forge-std/Test.sol";
 
-import { base_erc20, IERC20 } from "../src/base_erc20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { base_erc20 } from "../src/base_erc20.sol";
 import { ERC20Bridge } from "../src/ERC20Bridge.sol";
 import { IAccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
@@ -69,7 +69,12 @@ contract ERC20BridgeTest is Test {
                 vm.startPrank(deployer);
 
             // deploy tokens
-                token = new base_erc20();
+                token = new base_erc20({
+                    _name: "TestToken",
+                    _symbol: "TT",
+                    decimals_: 18,
+                    _totalSupply: 1000 ether
+                });
             // deploy bridge
                 bridge = new ERC20Bridge({
                     bridgeSigner_: bridgeSigner,
@@ -84,14 +89,16 @@ contract ERC20BridgeTest is Test {
                     feeDepositAmount: depositFee,
                     feeWithdrawAmount: withdrawFee,
                     max24hDeposits: max24hDeposit,
-                    max24hWithdraws: max24hWithdraw
+                    max24hWithdraws: max24hWithdraw,
+                    targetChainId: chain_B_id
                 });
                 bridge.setFeeStatus(true);
                 bridge.setBridgeStatus(true);
                 bridge.setTokenFees({
                     tokenAddress: address(token),
                     depositFee: depositFee,
-                    withdrawFee: withdrawFee
+                    withdrawFee: withdrawFee,
+                    targetChainId: chain_B_id
                 });
             // send tokens to deposit to the users
                 token.transfer(user1, 1000 ether);
@@ -148,7 +155,7 @@ contract ERC20BridgeTest is Test {
             // deposit tokens
             vm.expectEmit(address(bridge));
             emit TokenDeposited(address(token), users[i], amountToDeposit - fee, fee, chain_B_id);
-            bridge.depositERC20(address(token), amountToDeposit, chain_B_id);
+            bridge.depositERC20(address(token), amountToDeposit, chain_B_id, "test");
             // check user balance
             assertEq(token.balanceOf(users[i]), 900 ether);
             // exit user
@@ -168,7 +175,7 @@ contract ERC20BridgeTest is Test {
             // withdraw for the user
             vm.expectEmit(address(bridge));
             emit TokenWithdrawn(address(token), users[i], amountToWithdrawTaxed, _withdrawFee, block.chainid);
-            bridge.withdrawERC20(address(token), users[i], amountToWithdraw);
+            bridge.withdrawERC20(address(token), users[i], amountToWithdraw, "test");
         }
 
         // check user balance
@@ -192,12 +199,12 @@ contract ERC20BridgeTest is Test {
         vm.expectRevert(ERC20Bridge.BridgeIsPaused.selector);
         // user1 cannot deposit
         vm.prank(user1);
-        bridge.depositERC20(address(token), 100 ether, chain_B_id);
+        bridge.depositERC20(address(token), 100 ether, chain_B_id, "test");
         // withdraw
         vm.expectRevert(ERC20Bridge.BridgeIsPaused.selector);
         // bridge cannot withdraw
         vm.prank(bridgeSigner);
-        bridge.withdrawERC20(address(token), user1, 1);
+        bridge.withdrawERC20(address(token), user1, 1, "test");
     }
     struct UserData {
             bool canWithdraw;
@@ -214,7 +221,7 @@ contract ERC20BridgeTest is Test {
         // user1 cannot deposit if the bridge is off
         vm.prank(user1);
         vm.expectRevert(ERC20Bridge.BridgeIsPaused.selector);
-        bridge.depositERC20(address(token), amountToDeposit, chain_B_id);
+        bridge.depositERC20(address(token), amountToDeposit, chain_B_id, "test");
 
         vm.prank(deployer);
         bridge.setBridgeStatus(true);
@@ -222,11 +229,11 @@ contract ERC20BridgeTest is Test {
         // user1 cannot deposit if he has not enough tokens
         vm.startPrank(user1);
         vm.expectRevert(ERC20Bridge.NoTokensToDeposit.selector);
-        bridge.depositERC20(address(token), amountToDeposit + 1, chain_B_id);
+        bridge.depositERC20(address(token), amountToDeposit + 1, chain_B_id, "test");
 
         // user1 cannot deposit if he has no approved the bridge
         vm.expectRevert(ERC20Bridge.TokenAllowanceError.selector);
-        bridge.depositERC20(address(token), amountToDeposit, chain_B_id); 
+        bridge.depositERC20(address(token), amountToDeposit, chain_B_id, "test");
 
         // approve
         token.approve(address(bridge), amountToDeposit * 2);
@@ -236,11 +243,11 @@ contract ERC20BridgeTest is Test {
 
         // user1 cannot deposit more then max24hDeposit
         vm.expectRevert(abi.encodeWithSelector(ERC20Bridge.TooManyTokensToDeposit.selector, uint(500 ether)));
-        bridge.depositERC20(address(token), amountToDeposit, chain_B_id);
+        bridge.depositERC20(address(token), amountToDeposit, chain_B_id, "test");
 
         // user1 cannot deposit a token that is not active
         vm.expectRevert(ERC20Bridge.TokenNotSupported.selector);
-        bridge.depositERC20(address(this), amountToDeposit, chain_B_id);
+        bridge.depositERC20(address(this), amountToDeposit, chain_B_id, "test");
 
         // user1 can deposit
         amountToDeposit /= 2;
@@ -248,7 +255,7 @@ contract ERC20BridgeTest is Test {
 
         vm.expectEmit(address(bridge));
         emit TokenDeposited(address(token), user1, amountToDeposit - fees, fees, block.chainid);
-        bridge.depositERC20(address(token), amountToDeposit, chain_B_id);
+        bridge.depositERC20(address(token), amountToDeposit, chain_B_id, "test");
 
         // check user data on bridge
         UserData memory userData;
@@ -270,14 +277,14 @@ contract ERC20BridgeTest is Test {
         // user1 cannot withdraw
         vm.prank(user1);
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, user1, keccak256("BRIDGE")));
-        bridge.withdrawERC20(address(token), user1, 1);
+        bridge.withdrawERC20(address(token), user1, 1, "test");
 
         // approve bridge to spend tokens
         vm.prank(user1);
         token.approve(address(bridge), amountToDeposit);
         // deposit in bridge
         vm.prank(user1);
-        bridge.depositERC20(address(token), amountToDeposit, chain_B_id);
+        bridge.depositERC20(address(token), amountToDeposit, chain_B_id, "test");
 
         // bridge cannot withdraw if the bridge is not active
         vm.prank(deployer);
@@ -285,7 +292,7 @@ contract ERC20BridgeTest is Test {
 
         vm.prank(bridgeSigner);
         vm.expectRevert(ERC20Bridge.BridgeIsPaused.selector);
-        bridge.withdrawERC20(address(token), user1, 1);
+        bridge.withdrawERC20(address(token), user1, 1, "test");
 
         vm.prank(deployer);
         bridge.setBridgeStatus(true);
@@ -293,7 +300,7 @@ contract ERC20BridgeTest is Test {
         // user1 cannot withdraw if the ERC20 contract is not active
         vm.prank(bridgeSigner);
         vm.expectRevert(ERC20Bridge.TokenNotSupported.selector);
-        bridge.withdrawERC20(address(this), user1, 1);
+        bridge.withdrawERC20(address(this), user1, 1, "test");
 
         // withdraw
         uint withdrawAmount = amountToDeposit - depositFees;
@@ -302,7 +309,7 @@ contract ERC20BridgeTest is Test {
         vm.expectEmit(address(bridge));
         emit TokenWithdrawn(address(token), user1, withdrawAmount - withdrawFees, withdrawFees, block.chainid);
         vm.prank(bridgeSigner);
-        bridge.withdrawERC20(address(token), user1, withdrawAmount);
+        bridge.withdrawERC20(address(token), user1, withdrawAmount, "test");
 
         // check balances
         assertEq(token.balanceOf(user1), 500 ether + (withdrawAmount - withdrawFees));
@@ -327,7 +334,8 @@ contract ERC20BridgeTest is Test {
         bridge.setTokenFees({
             tokenAddress: address(token),
             depositFee: 1000,
-            withdrawFee: 1000
+            withdrawFee: 1000,
+            targetChainId: block.chainid
         });
 
         (
@@ -358,17 +366,18 @@ contract ERC20BridgeTest is Test {
             feeDepositAmount: 1000,
             feeWithdrawAmount: 1000,
             max24hDeposits: 500 ether,
-            max24hWithdraws: 500 ether
+            max24hWithdraws: 500 ether,
+            targetChainId: block.chainid
         });
 
         (
             bool isActive,
             bool burnOnDeposit,
-            uint feeDepositAmount,
-            uint feeWithdrawAmount,
             uint max24hDeposits,
-            uint max24hWithdraws
+            uint max24hWithdraws,,
         ) = bridge.tokens(address(token));
+        uint feeDepositAmount = bridge.getDepositFeeAmount(address(token), block.chainid);
+        uint feeWithdrawAmount = bridge.getWithdrawFeeAmount(address(token), block.chainid);
         
         assertEq(isActive, true);
         assertEq(burnOnDeposit, false);
@@ -379,7 +388,7 @@ contract ERC20BridgeTest is Test {
     }
 
     function test_getDepositFeeAmount() public {
-        assertEq(bridge.getDepositFeeAmount(address(token)), depositFee);
+        assertEq(bridge.getDepositFeeAmount(address(token), block.chainid), depositFee);
     }
 
     function test_max_deposit() public {
@@ -395,11 +404,11 @@ contract ERC20BridgeTest is Test {
         token.approve(address(bridge), type(uint).max);
 
         // deposit max amount for the day
-        bridge.depositERC20(address(token), max24hDeposit, chain_B_id);
+        bridge.depositERC20(address(token), max24hDeposit, chain_B_id, "test");
 
         // user1 cannot deposit again in 24h
         vm.expectRevert(abi.encodeWithSelector(ERC20Bridge.TooManyTokensToDeposit.selector, max24hDeposit));
-        bridge.depositERC20(address(token), fee, chain_B_id);
+        bridge.depositERC20(address(token), fee, chain_B_id, "test");
     }
 
     function test_burn_on_deposit() public {
@@ -412,7 +421,8 @@ contract ERC20BridgeTest is Test {
             feeDepositAmount: 1000,
             feeWithdrawAmount: 1000,
             max24hDeposits: 500 ether,
-            max24hWithdraws: 500 ether
+            max24hWithdraws: 500 ether,
+            targetChainId: block.chainid
         });
 
         // impersonate user1
@@ -427,7 +437,7 @@ contract ERC20BridgeTest is Test {
         // deposit
         vm.expectEmit(address(bridge));
         emit TokenDeposited(address(token), user1, amountToDeposit - fee, fee, chain_B_id);
-        bridge.depositERC20(address(token), amountToDeposit, chain_B_id);
+        bridge.depositERC20(address(token), amountToDeposit, chain_B_id, "test");
 
         // check user balance
         assertEq(token.balanceOf(user1), balanceBefore - amountToDeposit);
