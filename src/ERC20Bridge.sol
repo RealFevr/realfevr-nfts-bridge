@@ -37,6 +37,7 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
     mapping(address tokenAddress => ERC20Contracts)                            public tokens;
     mapping(string key => bool used)                                           public depositUniqueKeys;
     mapping(string key => bool used)                                           public withdrawUniqueKeys;
+    mapping(string key => bool used)                                           public mintUniqueKeys;
 
     struct UserData {
         uint depositAmount;
@@ -61,6 +62,8 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
     error NoTokensToDeposit();
     error TooManyTokensToDeposit(uint maxDeposit);
     error TooManyTokensToWithdraw(uint maxWithdraw);
+    error TooManyTokensToMint(uint maxMint);
+    error TooManyTokensToBurn(uint maxBurn);
     error TokenNotSupported();
     error TokenTransferError();
     error TokenAllowanceError();
@@ -75,6 +78,7 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
     event TokenDeposited(address indexed tokenAddress, address indexed user, uint amount, uint fee, uint chainId);
     event TokenWithdrawn(address indexed tokenAddress, address indexed user, uint amount, uint fee, uint chainId);
     event ERC20DetailsSet(address indexed contractAddress, bool isActive, uint feeDepositAmount, uint feeWithdrawAmount);
+    event Minted(address indexed tokenAddress, address indexed user, uint amount, string uniqueKey);
 
     /**
      * @notice constructor will set the roles and the bridge fee
@@ -205,8 +209,8 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
         if (IERC20(tokenAddress).balanceOf(msg.sender) < amount)                revert NoTokensToDeposit();
         // user must have approved the bridge to spend the tokens
         if (IERC20(tokenAddress).allowance(msg.sender, address(this)) < amount) revert TokenAllowanceError();
-        // bridge must not have reached the max 24h deposit amount
-        if (currentDepositedAmount + amount > token.max24hDeposits) {
+        // bridge must not have reached the max 24h deposit amount - admin can bypass this
+        if (currentDepositedAmount + amount > token.max24hDeposits && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
             revert TooManyTokensToDeposit(token.max24hDeposits);
         }
         // unique key must not have been used before
@@ -322,7 +326,7 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
         return(address(new base_erc20(_name, _symbol, _totalSupply, _decimals)));
     }
 
-    function mintToken(address _tokenAddress, address _to, uint _amount) public {
+    function mintToken(address _tokenAddress, address _to, uint _amount, string calldata uniqueKey) public {
         // only admin or bridge can call this
         if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || !hasRole(BRIDGE, msg.sender)) revert NotAuthorized();
         // bridge role has mint limits
@@ -331,11 +335,17 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
             uint currentDay = block.timestamp / 1 days;
             uint currentMintedAmount = dailyMints[_tokenAddress][currentDay];
             // bridge must not have reached the max 24h mint amount (bridge limit only)
-            if (currentMintedAmount + _amount > token.max24hDeposits) revert TooManyTokensToWithdraw(token.max24hDeposits);
+            if (currentMintedAmount + _amount > token.totalMintedLast24Hours) revert TooManyTokensToMint(token.totalMintedLast24Hours);
             // set daily mint amount
             token.totalMintedLast24Hours += _amount;
         }
+        // unique key must not have been used before
+        if (mintUniqueKeys[uniqueKey]) revert UniqueKeyUsed();
+        mintUniqueKeys[uniqueKey] = true;
+
+        // mint tokens
         base_erc20(_tokenAddress).mint(_to, _amount);
+        emit Minted(_tokenAddress, _to, _amount, uniqueKey);
     }
 
     function burnToken(address _tokenAddress, uint _amount) public {
@@ -347,7 +357,7 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
             uint currentDay = block.timestamp / 1 days;
             uint currentBurnedAmount = dailyBurns[_tokenAddress][currentDay];
             // bridge must not have reached the max 24h mint amount (bridge limit only)
-            if (currentBurnedAmount + _amount > token.max24hWithdraws) revert TooManyTokensToWithdraw(token.max24hWithdraws);
+            if (currentBurnedAmount + _amount > token.totalBurnedLast24Hours) revert TooManyTokensToBurn(token.totalBurnedLast24Hours);
             // set daily mint amount
             token.totalBurnedLast24Hours += _amount;
         }
