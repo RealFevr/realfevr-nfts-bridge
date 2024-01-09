@@ -47,6 +47,7 @@ contract Base is Script {
             feeReceiver_: feeReceiver,
             operator_: operatorAddress
         });
+        console.log("Bridge deployed at: ", address(bridge));
     }
 
     function setERC20Details(
@@ -57,6 +58,8 @@ contract Base is Script {
         uint feeWithdrawalAmount,
         uint max24hDeposits,
         uint max24hWithdraws,
+        uint max24hmints,
+        uint max24hburns,
         uint targetChainId
     ) public {
         bridge.setERC20Details(
@@ -67,6 +70,8 @@ contract Base is Script {
             feeWithdrawalAmount,
             max24hDeposits,
             max24hWithdraws,
+            max24hmints,
+            max24hburns,
             targetChainId
         );
     }
@@ -122,6 +127,8 @@ contract DeployAllAndSetBridgeERC20 is Base {
             feeWithdrawalAmount: 0,
             max24hDeposits: 20_000_000 ether,
             max24hWithdraws: 20_000_000 ether,
+            max24hmints: 20_000_000 ether,
+            max24hburns: 20_000_000 ether,
             targetChainId: 1
         });
         setTokenFees(address(token), 0, 0, 1);
@@ -163,7 +170,7 @@ contract DepositInBridgeERC20 is Base {
         // approve bridge to spend 1000 tokens
         vm.startBroadcast(test_user_pkey);
         _token.approve(address(_bridge), amount);
-        _bridge.depositERC20(address(_token), amount, targetChainId, uniqueKey);
+        _bridge.depositERC20(address(_token), amount, targetChainId);
         vm.stopBroadcast();
 
         vm.startBroadcast(bridgeSigner);

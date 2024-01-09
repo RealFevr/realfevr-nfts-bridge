@@ -35,10 +35,14 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
     mapping(address tokenAddress => mapping(uint day => uint burnAmount))      public dailyBurns;
     mapping(address user =>         mapping(address tokenAddress => UserData)) public userData;
     mapping(address tokenAddress => ERC20Contracts)                            public tokens;
-    mapping(string key => bool used)                                           public depositUniqueKeys;
     mapping(string key => bool used)                                           public withdrawUniqueKeys;
     mapping(string key => bool used)                                           public mintUniqueKeys;
+    mapping(uint chainId => ChainETHFee)                                       public ethDepositFee;
 
+    struct ChainETHFee {
+        bool isActive;
+        uint amount;
+    }
     struct UserData {
         uint depositAmount;
     }
@@ -48,8 +52,8 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
         bool burnOnDeposit;
         uint max24hDeposits;
         uint max24hWithdraws;
-        uint256 totalMintedLast24Hours;
-        uint256 totalBurnedLast24Hours;
+        uint max24hmints;
+        uint max24hburns;
         mapping(uint chainId => uint feeDepositAmount) feeDeposit;
         mapping(uint chainId => uint feeWithdrawAmount) feeWithdraw;
     }
@@ -67,17 +71,26 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
     error TokenNotSupported();
     error TokenTransferError();
     error TokenAllowanceError();
+    error InsufficentETHAmountForFee(uint ethRequired);
+    error ETHTransferError();
+
 
     // bridge events
     event BridgeIsOnline(bool isActive);
     event BridgeFeesAreActive(bool isActive);
     event FeesSet(address indexed tokenAddress, uint depositFee, uint withdrawFee, uint targetChainId);
     event FeeReceiverSet(address indexed feeReceiver);
+    event ETHFeeSet(uint chainId, bool active, uint amount);
+    event ETHFeeCollected(uint amount);
     // token events
     event TokenEdited(address indexed tokenAddress, uint maxDeposit, uint maxWithdraw, uint max24hDeposits, uint max24hWithdraws);
     event TokenDeposited(address indexed tokenAddress, address indexed user, uint amount, uint fee, uint chainId);
     event TokenWithdrawn(address indexed tokenAddress, address indexed user, uint amount, uint fee, uint chainId);
-    event ERC20DetailsSet(address indexed contractAddress, bool isActive, uint feeDepositAmount, uint feeWithdrawAmount);
+    event ERC20DetailsSet(
+        address indexed contractAddress, bool isActive, uint feeDepositAmount,
+        uint feeWithdrawAmount, uint max24hDeposits, uint max24hWithdraws,
+        uint max24hmints, uint max24hburns
+    );
     event Minted(address indexed tokenAddress, address indexed user, uint amount, string uniqueKey);
 
     /**
@@ -116,6 +129,19 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
     function setFeeStatus(bool active) external onlyRole(OPERATOR) {
         feeActive = active;
         emit BridgeFeesAreActive(active);
+    }
+
+    /**
+     * @notice set the ETH fee on specified chain id
+     * @dev only operator can call this
+     * @param chainId uint of the chain id
+     * @param status bool to activate or deactivate the fees
+     * @param amount uint of the fee amount
+     */
+    function setETHFee(uint chainId, bool status, uint amount) external onlyRole(OPERATOR) {
+        ethDepositFee[chainId].isActive = status;
+        ethDepositFee[chainId].amount = amount;
+        emit ETHFeeSet(chainId, status, amount);
     }
 
     /**
@@ -168,6 +194,8 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
         uint feeWithdrawAmount,
         uint max24hDeposits,
         uint max24hWithdraws,
+        uint max24hmints,
+        uint max24hburns,
         uint targetChainId
     ) external onlyRole(OPERATOR) {
         ERC20Contracts storage token = tokens[tokenAddress];
@@ -177,11 +205,17 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
         token.feeWithdraw[targetChainId] = feeWithdrawAmount;
         token.max24hDeposits = max24hDeposits;
         token.max24hWithdraws = max24hWithdraws;
+        token.max24hmints = max24hmints;
+        token.max24hburns = max24hburns;
         emit ERC20DetailsSet(
             tokenAddress,
             isActive,
             feeDepositAmount,
-            feeWithdrawAmount
+            feeWithdrawAmount,
+            max24hDeposits,
+            max24hWithdraws,
+            max24hmints,
+            max24hburns
         );
     }
 
@@ -192,13 +226,14 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
      * @param tokenAddress address of the token contract
      * @param amount uint of the token amount
      * @param targetChainId uint of the target chain id
-     * @param uniqueKey string of the unique key
      */
-    function depositERC20(address tokenAddress, uint amount, uint targetChainId, string calldata uniqueKey) external nonReentrant {
+    function depositERC20(address tokenAddress, uint amount, uint targetChainId) external payable nonReentrant {
         // TODO: sanitize targetChainId
-        ERC20Contracts storage token    = tokens[tokenAddress];
+        ERC20Contracts storage token     = tokens[tokenAddress];
         UserData       storage _userData = userData[msg.sender][tokenAddress];
-        uint currentDay = block.timestamp / 1 days;
+        ChainETHFee    storage ethFee    = ethDepositFee[targetChainId];
+        uint ethFeeAmount = ethFee.amount;
+        uint currentDay   = block.timestamp / 1 days;
         uint currentDepositedAmount = dailyDeposits[tokenAddress][currentDay];
 
         // bridge must be active
@@ -213,9 +248,6 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
         if (currentDepositedAmount + amount > token.max24hDeposits && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
             revert TooManyTokensToDeposit(token.max24hDeposits);
         }
-        // unique key must not have been used before
-        if (depositUniqueKeys[uniqueKey]) revert UniqueKeyUsed();
-        depositUniqueKeys[uniqueKey] = true;
 
         uint feeAmount;
         // apply the fees if active and != 0
@@ -224,6 +256,15 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
             if(feeAmount != 0) {
                 amount -= feeAmount;
             }
+        }
+        // check if ETH fees are active and > 0
+        if (ethFee.isActive && ethFeeAmount > 0) {
+            // check if user has enough ETH to pay for the bridge
+            if(msg.value != ethFeeAmount) revert InsufficentETHAmountForFee(ethFeeAmount);
+            // send ETH fee to feeReceiver
+            (bool success,) = feeReceiver.call{value: msg.value}("");
+            emit ETHFeeCollected(msg.value);
+            if (!success) revert ETHTransferError();
         }
 
         // set user details
@@ -335,9 +376,9 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
             uint currentDay = block.timestamp / 1 days;
             uint currentMintedAmount = dailyMints[_tokenAddress][currentDay];
             // bridge must not have reached the max 24h mint amount (bridge limit only)
-            if (currentMintedAmount + _amount > token.totalMintedLast24Hours) revert TooManyTokensToMint(token.totalMintedLast24Hours);
+            if (currentMintedAmount + _amount > token.max24hmints) revert TooManyTokensToMint(token.max24hmints);
             // set daily mint amount
-            token.totalMintedLast24Hours += _amount;
+            dailyMints[_tokenAddress][currentDay] += _amount;
         }
         // unique key must not have been used before
         if (mintUniqueKeys[uniqueKey]) revert UniqueKeyUsed();
@@ -357,9 +398,9 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
             uint currentDay = block.timestamp / 1 days;
             uint currentBurnedAmount = dailyBurns[_tokenAddress][currentDay];
             // bridge must not have reached the max 24h mint amount (bridge limit only)
-            if (currentBurnedAmount + _amount > token.totalBurnedLast24Hours) revert TooManyTokensToBurn(token.totalBurnedLast24Hours);
-            // set daily mint amount
-            token.totalBurnedLast24Hours += _amount;
+            if (currentBurnedAmount + _amount > token.max24hburns) revert TooManyTokensToBurn(token.max24hburns);
+            // set daily burn amount
+            dailyBurns[_tokenAddress][currentDay] += _amount;
         }
         base_erc20(_tokenAddress).burn(_amount);
     }
