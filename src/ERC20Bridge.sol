@@ -363,13 +363,13 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
 
     function createNewToken(string memory _name, string memory _symbol, uint _totalSupply, uint8 _decimals) external returns(address) {
         // only operator or bridge can call this
-        if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || !hasRole(BRIDGE, msg.sender)) revert NotAuthorized();
+        if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(BRIDGE, msg.sender)) revert NotAuthorized();
         return(address(new base_erc20(_name, _symbol, _totalSupply, _decimals)));
     }
 
     function mintToken(address _tokenAddress, address _to, uint _amount, string calldata uniqueKey) public {
         // only admin or bridge can call this
-        if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || !hasRole(BRIDGE, msg.sender)) revert NotAuthorized();
+        if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(BRIDGE, msg.sender)) revert NotAuthorized();
         // bridge role has mint limits
         if(hasRole(BRIDGE, msg.sender)) {
             ERC20Contracts storage token    = tokens[_tokenAddress];
@@ -391,7 +391,7 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
 
     function burnToken(address _tokenAddress, uint _amount) public {
         // only admin or bridge can call this
-        if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || !hasRole(BRIDGE, msg.sender)) revert NotAuthorized();
+        if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(BRIDGE, msg.sender)) revert NotAuthorized();
         // bridge role has mint limits
         if(hasRole(BRIDGE, msg.sender)) {
             ERC20Contracts storage token    = tokens[_tokenAddress];
