@@ -216,7 +216,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
      * @param nftAddress address of the NFT contract
      * @param tokenId uint of the NFT id
      */
-    function depositSingleERC721(address nftAddress, uint tokenId, uint targetChainId, string calldata uniqueKey) external payable nonReentrant {
+    function depositSingleERC721(address nftAddress, uint tokenId, uint targetChainId) public payable nonReentrant {
         // storage to access NFT Contract, NFT and erc20 details
         NFTContracts storage nftContract = permittedNFTs[nftAddress];
         NFT storage nft = nftListPerContract[nftAddress][tokenId];
@@ -232,9 +232,6 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
         if (!erc20Token.isActive) revert ERC20ContractNotActive();
         // NFT must be owned by msg.sender - @audit can be removed for gas opt
         if(IERC721(nftAddress).ownerOf(tokenId) != msg.sender) revert NFTNotOwnedByYou();
-        // unique key must not be used before
-        if(withdrawUniqueKeys[uniqueKey]) revert UniqueKeyUsed();
-        withdrawUniqueKeys[uniqueKey] = true;
 
 
         // check if fees are active and > 0
@@ -264,13 +261,20 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
         emit NFTDeposited(nftAddress, msg.sender, tokenId, bridgeCost, targetChainId);
     }
 
+    function depositMultipleERC721(address[] calldata nftAddress, uint[] calldata tokenIds, uint targetChainId) external payable nonReentrant {
+        // for each NFT, call depositSingleERC721
+        for(uint i = 0; i < nftAddress.length; i++) {
+            depositSingleERC721(nftAddress[i], tokenIds[i], targetChainId);
+        }
+    }
+
     /**
      * @notice deposit multiple ERC721 tokens to the bridge
      * @param nftAddress address of the NFT contract
      * @param tokenAddress address of the ERC20 token to pay the fee
      * @param tokenIds uint[] of the NFT ids
      */
-    function depositMultipleERC721(address nftAddress, address tokenAddress, uint[] memory tokenIds, uint targetChainId) external payable nonReentrant {
+    function temp_depositMultipleERC721(address nftAddress, address tokenAddress, uint[] memory tokenIds, uint targetChainId) external payable nonReentrant {
         uint nftQuantity = tokenIds.length;
         // storage to access NFT Contract, NFT and erc20 details
         NFTContracts storage nftContract = permittedNFTs[nftAddress];
