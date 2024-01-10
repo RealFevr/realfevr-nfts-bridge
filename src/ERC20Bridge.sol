@@ -363,7 +363,7 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
 
     function createNewToken(string memory _name, string memory _symbol, uint _totalSupply, uint8 _decimals) external returns(address) {
         // only operator or bridge can call this
-        if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(BRIDGE, msg.sender)) revert NotAuthorized();
+        if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert NotAuthorized();
         return(address(new base_erc20(_name, _symbol, _totalSupply, _decimals)));
     }
 
