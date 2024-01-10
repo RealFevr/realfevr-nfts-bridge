@@ -23,10 +23,12 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
     address public feeReceiver;
     uint public maxNFTsPerTx = 50;
 
-    mapping(uint chainId => ChainETHFee) public ethDepositFee;
-    mapping(address => NFTContracts) public permittedNFTs;
-    mapping(address => ERC20Tokens) public permittedERC20s;
+    mapping(uint chainId => ChainETHFee)     public ethDepositFee;
+    mapping(address => NFTContracts)         public permittedNFTs;
+    mapping(address => ERC20Tokens)          public permittedERC20s;
     mapping(address => mapping(uint => NFT)) public nftListPerContract;
+    mapping(string key => bool used)         public withdrawUniqueKeys;
+    mapping(string key => bool used)         public mintUniqueKeys;
 
     struct ChainETHFee {
         bool isActive;
@@ -69,6 +71,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
     // tokens
     error ERC20ContractNotActive();                 // when the ERC20 contract is not active
     error ERC20TransferError();                     // when the ERC20 transfer fails
+    error UniqueKeyUsed();                          // when the unique key is already used
 
     // bridge
     event BridgeIsOnline(bool active);
@@ -83,6 +86,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
     event NFTDeposited(address indexed contractAddress, address owner, uint256 tokenId, uint256 fee, uint targetChainId);
     event NFTWithdrawn(address indexed contractAddress, address owner, uint256 tokenId);
     event NFTDetailsSet(bool isActive, address nftContractAddress, address feeTokenAddress, uint feeAmount);
+    event ERC721Minted(address indexed nftAddress, address indexed to, uint256 tokenId, string uniqueKey);
     // tokens
     event ERC20DetailsSet(bool isActive, address erc20ContractAddress);
 
@@ -212,7 +216,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
      * @param nftAddress address of the NFT contract
      * @param tokenId uint of the NFT id
      */
-    function depositSingleERC721(address nftAddress, uint tokenId, uint targetChainId) external payable nonReentrant {
+    function depositSingleERC721(address nftAddress, uint tokenId, uint targetChainId, string calldata uniqueKey) external payable nonReentrant {
         // storage to access NFT Contract, NFT and erc20 details
         NFTContracts storage nftContract = permittedNFTs[nftAddress];
         NFT storage nft = nftListPerContract[nftAddress][tokenId];
@@ -228,6 +232,11 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
         if (!erc20Token.isActive) revert ERC20ContractNotActive();
         // NFT must be owned by msg.sender - @audit can be removed for gas opt
         if(IERC721(nftAddress).ownerOf(tokenId) != msg.sender) revert NFTNotOwnedByYou();
+        // unique key must not be used before
+        if(withdrawUniqueKeys[uniqueKey]) revert UniqueKeyUsed();
+        withdrawUniqueKeys[uniqueKey] = true;
+
+
         // check if fees are active and > 0
         if (ethFee.isActive && ethFeeAmount > 0) {
             // check if user has enough ETH to pay for the bridge
@@ -417,7 +426,11 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
      * @param to address of the user to mint to
      * @param tokenId uint of the NFT id
      */
-    function mintERC721(address nftAddress, address to, uint tokenId) public onlyRole(BRIDGE) {
+    function mintERC721(address nftAddress, address to, uint tokenId, string calldata uniqueKey) public onlyRole(BRIDGE) {
+        // unique key must not be used before
+        if(mintUniqueKeys[uniqueKey]) revert UniqueKeyUsed();
+        mintUniqueKeys[uniqueKey] = true;
         base_erc721(nftAddress).safeMintTo(to, tokenId);
+        emit ERC721Minted(nftAddress, to, tokenId, uniqueKey);
     }
 }

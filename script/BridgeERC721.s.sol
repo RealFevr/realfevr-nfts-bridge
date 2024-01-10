@@ -161,6 +161,6 @@ contract DepositInBridgeERC721 is Base {
         _nft.safeMint(deployerAddress);
 
         // deposit the nft
-        _bridge.depositSingleERC721{value: ethDepositFeeAmount}(address(_nft), 0, block.chainid);
+        _bridge.depositSingleERC721{value: ethDepositFeeAmount}(address(_nft), 0, block.chainid, "test");
     }
 }
