@@ -369,7 +369,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
      * @param contractAddress address of the NFT contract
      * @param tokenIds uint[] of the NFT ids
      */
-    function withdrawMultipleERC721(address to, address contractAddress, uint[] memory tokenIds, string[] memory uniqueKeys) external onlyRole(BRIDGE) {
+    function withdrawMultipleERC721(address to, address contractAddress, uint[] memory tokenIds, string[] calldata uniqueKeys) external onlyRole(BRIDGE) {
         for(uint i = 0; i < tokenIds.length; i++) {
             withdrawSingleERC721(to, contractAddress, uniqueKeys[i]);
         }
