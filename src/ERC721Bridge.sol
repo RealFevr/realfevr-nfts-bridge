@@ -371,7 +371,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
      */
     function withdrawMultipleERC721(address to, address contractAddress, uint[] memory tokenIds, string[] calldata uniqueKeys) external onlyRole(BRIDGE) {
         for(uint i = 0; i < tokenIds.length; i++) {
-            withdrawSingleERC721(to, contractAddress, uniqueKeys[i]);
+            withdrawSingleERC721(to, contractAddress, tokenIds[i], uniqueKeys[i]);
         }
     }
 
