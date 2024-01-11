@@ -84,7 +84,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
     event ETHFeeCollected(uint amount);
     // nft
     event NFTDeposited(address indexed contractAddress, address owner, uint256 tokenId, uint256 fee, uint targetChainId);
-    event NFTWithdrawn(address indexed contractAddress, address owner, uint256 tokenId);
+    event NFTWithdrawn(address indexed contractAddress, address owner, uint256 tokenId, string uniqueKey);
     event NFTDetailsSet(bool isActive, address nftContractAddress, address feeTokenAddress, uint feeAmount);
     event ERC721Minted(address indexed nftAddress, address indexed to, uint256 tokenId, string uniqueKey);
     // tokens
@@ -343,7 +343,9 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
      * @param nftContractAddress address of the NFT contract
      * @param tokenId uint of the NFT id
      */
-    function withdrawSingleERC721(address to, address nftContractAddress, uint tokenId) public onlyRole(BRIDGE) {
+    function withdrawSingleERC721(address to, address nftContractAddress, uint tokenId, string calldata uniqueKey) public onlyRole(BRIDGE) {
+        if(withdrawUniqueKeys[uniqueKey]) revert UniqueKeyUsed();
+        withdrawUniqueKeys[uniqueKey] = true;
         // storage to access NFT Contract, NFT and erc20 details
         NFTContracts storage nftContract = permittedNFTs[nftContractAddress];
 
@@ -357,7 +359,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
 
         // transfer NFT to user
         IERC721(nftContractAddress).transferFrom(address(this), to, tokenId);
-        emit NFTWithdrawn(nftContractAddress, to, tokenId);
+        emit NFTWithdrawn(nftContractAddress, to, tokenId, uniqueKey);
     }
 
     /**
@@ -367,9 +369,9 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
      * @param contractAddress address of the NFT contract
      * @param tokenIds uint[] of the NFT ids
      */
-    function withdrawMultipleERC721(address to, address contractAddress, uint[] memory tokenIds) external onlyRole(BRIDGE) {
+    function withdrawMultipleERC721(address to, address contractAddress, uint[] memory tokenIds, string[] memory uniqueKeys) external onlyRole(BRIDGE) {
         for(uint i = 0; i < tokenIds.length; i++) {
-            withdrawSingleERC721(to, contractAddress, tokenIds[i]);
+            withdrawSingleERC721(to, contractAddress, uniqueKeys[i]);
         }
     }
 

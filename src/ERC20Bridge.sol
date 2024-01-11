@@ -85,7 +85,7 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
     // token events
     event TokenEdited(address indexed tokenAddress, uint maxDeposit, uint maxWithdraw, uint max24hDeposits, uint max24hWithdraws);
     event TokenDeposited(address indexed tokenAddress, address indexed user, uint amount, uint fee, uint chainId);
-    event TokenWithdrawn(address indexed tokenAddress, address indexed user, uint amount, uint fee, uint chainId);
+    event TokenWithdrawn(address indexed tokenAddress, address indexed user, uint amount, uint fee, uint chainId, string uniqueKey);
     event ERC20DetailsSet(
         address indexed contractAddress, bool isActive, uint feeDepositAmount,
         uint feeWithdrawAmount, uint max24hDeposits, uint max24hWithdraws,
@@ -328,7 +328,7 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
             if(!IERC20(tokenAddress).transfer(feeReceiver, feeAmount)) revert TokenTransferError();
         }
         
-        emit TokenWithdrawn(tokenAddress, userAddress, amount, feeAmount, block.chainid);
+        emit TokenWithdrawn(tokenAddress, userAddress, amount, feeAmount, block.chainid, uniqueKey);
     }
 
     /**
