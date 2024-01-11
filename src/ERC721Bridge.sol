@@ -418,7 +418,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
      * @param symbol the symbol of the new NFT
      * @return nftAddress address of the new NFT contract
      */
-    function createERC721(string calldata uri, string calldata name, string calldata symbol) public onlyRole(BRIDGE) returns(address nftAddress) {
+    function createERC721(string calldata uri, string calldata name, string calldata symbol) public onlyRole(OPERATOR) returns(address nftAddress) {
         base_erc721 newERC721 = new base_erc721(name, symbol);
         newERC721.setBaseURI(uri);
         emit NFTDetailsSet(true, address(newERC721), address(0), 0);
