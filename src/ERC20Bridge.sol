@@ -299,7 +299,7 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
         uint currentDay = block.timestamp / 1 days;
         uint currentWithdrawalAmount = dailyWithdraws[tokenAddress][currentDay];
         // only admin or bridge can call this
-        if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || !hasRole(BRIDGE, msg.sender)) revert NotAuthorized();
+        if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(BRIDGE, msg.sender)) revert NotAuthorized();
         // bridge must be active
         if(!isOnline)                                                 revert BridgeIsPaused();
         // ERC20 token must be allowed to use bridge
