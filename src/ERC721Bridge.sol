@@ -29,6 +29,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
     mapping(address => mapping(uint => NFT)) public nftListPerContract;
     mapping(string key => bool used)         public withdrawUniqueKeys;
     mapping(string key => bool used)         public mintUniqueKeys;
+    mapping(uint chainId => bool supported)  public supportedChains;
 
     struct ChainETHFee {
         bool isActive;
@@ -76,6 +77,7 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
     // bridge
     event BridgeIsOnline(bool active);
     event BridgeFeesPaused(bool active);
+    error ChainNotSupported();                      // when the chain id is not supported
     // fees
     event FeesSet(bool active, address indexed nftAddress, address indexed tokenAddress, uint depositFee, uint withdrawFee);
     event FeeReceiverSet(address receiver);
@@ -107,6 +109,16 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
     // -----------------------------------------
     // -----------------------------------------
     // -----------------------------------------
+
+    /**
+     * @notice set the supported chain
+     * @dev only operator can call this
+     * @param chainId uint of the chain id
+     * @param status bool to enable or disable the chain id
+     */
+    function setSupportedChain(uint chainId, bool status) external onlyRole(OPERATOR) {
+        supportedChains[chainId] = status;
+    }
 
     /**
      * @notice max amount of NFTs that can be used in a tx
@@ -232,6 +244,8 @@ contract ERC721Bridge is ERC721Holder, AccessControl, ReentrancyGuard {
         if (!erc20Token.isActive) revert ERC20ContractNotActive();
         // NFT must be owned by msg.sender - @audit can be removed for gas opt
         if(IERC721(nftAddress).ownerOf(tokenId) != msg.sender) revert NFTNotOwnedByYou();
+        // chain id must be supported
+        if(!supportedChains[targetChainId]) revert ChainNotSupported();
 
 
         // check if fees are active and > 0

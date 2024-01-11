@@ -38,6 +38,7 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
     mapping(string key => bool used)                                           public withdrawUniqueKeys;
     mapping(string key => bool used)                                           public mintUniqueKeys;
     mapping(uint chainId => ChainETHFee)                                       public ethDepositFee;
+    mapping(uint chainId => bool supported)                                    public supportedChains;
 
     struct ChainETHFee {
         bool isActive;
@@ -62,6 +63,7 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
     error BridgeIsPaused();
     error NotAuthorized();
     error UniqueKeyUsed();
+    error ChainNotSupported();
     // token errors
     error NoTokensToDeposit();
     error TooManyTokensToDeposit(uint maxDeposit);
@@ -110,6 +112,16 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
     // -----------------------------------------
     // -----------------------------------------
     // -----------------------------------------
+
+    /**
+     * @notice set the supported chain
+     * @dev only operator can call this
+     * @param chainId uint of the chain id
+     * @param status bool to enable or disable the chain id
+     */
+    function setSupportedChain(uint chainId, bool status) external onlyRole(OPERATOR) {
+        supportedChains[chainId] = status;
+    }
 
     /**
      * @notice set the bridge status
@@ -228,7 +240,6 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
      * @param targetChainId uint of the target chain id
      */
     function depositERC20(address tokenAddress, uint amount, uint targetChainId) external payable nonReentrant {
-        // TODO: sanitize targetChainId
         ERC20Contracts storage token     = tokens[tokenAddress];
         UserData       storage _userData = userData[msg.sender][tokenAddress];
         ChainETHFee    storage ethFee    = ethDepositFee[targetChainId];
@@ -248,6 +259,8 @@ contract ERC20Bridge is AccessControl, ReentrancyGuard {
         if (currentDepositedAmount + amount > token.max24hDeposits && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
             revert TooManyTokensToDeposit(token.max24hDeposits);
         }
+        // chain id must be supported
+        if (!supportedChains[targetChainId])                                      revert ChainNotSupported();
 
         uint feeAmount;
         // apply the fees if active and != 0
