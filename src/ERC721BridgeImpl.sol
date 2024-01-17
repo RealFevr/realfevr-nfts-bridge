@@ -458,12 +458,38 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
      * @param nftAddress NFT contract address
      * @param to address of the user to mint to
      * @param tokenId uint of the NFT id
+     * @param uniqueKey string of the unique key
+     * @param _marketplaceDistributionRates array of uint16 of the marketplace distribution rates
+     * @param _marketplaceDistributionAddresses array of address of the marketplace distribution addresses
      */
-    function mintERC721(address nftAddress, address to, uint tokenId, string calldata uniqueKey) public onlyRole(BRIDGE) {
+    function mintERC721(address nftAddress, address to, uint tokenId, string calldata uniqueKey,
+    uint16[] calldata _marketplaceDistributionRates, address[] calldata _marketplaceDistributionAddresses) public onlyRole(BRIDGE) {
         // unique key must not be used before
         if(mintUniqueKeys[uniqueKey]) revert UniqueKeyUsed();
         mintUniqueKeys[uniqueKey] = true;
         base_erc721(nftAddress).safeMintTo(to, tokenId);
+        setMarketplaceDistributions(nftAddress, tokenId, _marketplaceDistributionRates, _marketplaceDistributionAddresses);
         emit ERC721Minted(nftAddress, to, tokenId, uniqueKey);
+    }
+
+    /**
+     * @notice Set the marktplace distribution on the NFT contract
+     * @dev only bridge signer can call this
+     * @param _nftAddress address of the NFT contract
+     * @param _tokenId uint of the NFT id
+     * @param _marketplaceDistributionRates array of uint16 of the marketplace distribution rates
+     * @param _marketplaceDistributionAddresses array of address of the marketplace distribution addresses
+     */
+    function setMarketplaceDistributions(
+        address _nftAddress,
+        uint256 _tokenId,
+        uint16[] calldata _marketplaceDistributionRates,
+        address[] calldata _marketplaceDistributionAddresses
+    ) public onlyRole(BRIDGE) {
+        require(
+            _marketplaceDistributionRates.length == _marketplaceDistributionAddresses.length,
+            "MarketplaceDistribution (on bridge): Rates and Addresses length mismatch"
+        );
+        base_erc721(_nftAddress).setMarketplaceDistributions(_tokenId, _marketplaceDistributionRates, _marketplaceDistributionAddresses);
     }
 }

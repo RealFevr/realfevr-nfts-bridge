@@ -110,11 +110,19 @@ contract Base is Script {
             amount: _amount
         });
     }
+
+    function showAddresses() public view {
+        console.log("ADDRESSES:");
+        console.log("deployerAddress: ",    deployerAddress);
+        console.log("bridgeAddress: ",      bridgeAddress);
+        console.log("operatorAddress: ",    operatorAddress);
+        console.log("feeReceiverAddress: ", feeReceiverAddress);
+    }
 }
 
-contract DeployAllAndSetBridgeERC721 is Base {
+contract DeployAllAndSetBridgeERC721Impl is Base {
     function run() external {
-
+        showAddresses();
     // deploy all
         vm.startBroadcast(deployerPKey);
         deployERC20();
@@ -143,13 +151,30 @@ contract DeployAllAndSetBridgeERC721 is Base {
     }
 }
 
-contract DeployBridge is Base {
+contract DeployBridgeImpl is Base {
     function run() external {
         deployBridge();
     }
 }
 
-contract DepositInBridgeERC721 is Base {
+/**
+ * @notice use this to deploy a new implementation and call upgradeToAndCall on the proxy
+ */
+contract UpgradeBridgeImpl is Base {
+    function run() external {
+        showAddresses();
+        // set the deployed proxy address here
+        address proxyAddress = 0xd458E3beAE1510bA316E97c6190E7B92b0955f8B;
+        vm.startBroadcast(deployerPKey);
+        // deploy a new implementation
+        address implementation = address(new ERC721BridgeImpl());
+        // call upgradeToAndCall on the proxy
+        ERC721BridgeImpl(proxyAddress).upgradeToAndCall(implementation, "");
+        vm.stopBroadcast();
+    }
+}
+
+contract DepositInBridgeERC721Impl is Base {
     function run() external {
         ERC20 _token    = ERC20  (0x1Ed8922AFCd1779db88d35AE0A626Ee895Bfac90);
         ERC721 _nft     = ERC721 (0x425279c23657F5Fb59375258aE911d5B6C9edE45);
