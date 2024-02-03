@@ -87,7 +87,7 @@ contract BridgeERC20_test is BaseTest {
         return bridgeERC20.createNewToken({
             _name: "TestToken",
             _symbol: "TT",
-            _totalSupply: 100_000 ether,
+            _totalSupply: 100_000_000 ether,
             _decimals: 18
         });
     }
@@ -267,9 +267,10 @@ contract BridgeERC20_test is BaseTest {
     // @audit - this is touching all the branches in sequence
     function test_depositERC20(uint amount, bool burnOnDeposit) public {
         vm.assume(amount > 0);
-        vm.assume(amount <= 100);
+        vm.assume(amount <= 100 ether);
 
-        uint targetChainId = 1;
+        uint targetChainId = block.chainid;
+        uint tokenFee = 100;
     // bridge must be active
         vm.prank(user1);
         vm.expectRevert(ERC20BridgeImpl.BridgeIsPaused.selector);
@@ -287,7 +288,12 @@ contract BridgeERC20_test is BaseTest {
         token = base_erc20(createToken());
         // set token details
         vm.prank(operator);
-        bridgeERC20.setERC20Details(address(token), true, burnOnDeposit, 100, 100, 100_000, 100_000, 1_000_000, 1_000_000, targetChainId);
+        bridgeERC20.setERC20Details(
+            address(token), true, burnOnDeposit,
+            tokenFee, tokenFee, 100_000 ether,
+            100_000 ether, 1_000_000 ether, 1_000_000 ether,
+            targetChainId
+        );
 
 
     // user must have enough balance
@@ -296,7 +302,7 @@ contract BridgeERC20_test is BaseTest {
         bridgeERC20.depositERC20(address(token), amount, targetChainId);
 
         vm.prank(bridgeSigner);
-        bridgeERC20.mintToken(address(token), user1, 100, "test1");
+        bridgeERC20.mintToken(address(token), user1, 100 ether, "test1");
 
     // user must have enough allowance
         vm.prank(user1);
@@ -306,7 +312,7 @@ contract BridgeERC20_test is BaseTest {
     // bridge must not have reached the max 24h deposit amount - admin can bypass this
     // chain id must be supported
         uint _snap = vm.snapshot();
-        uint amountToDepositAsBSigner = 100_000;
+        uint amountToDepositAsBSigner = 100_000 ether;
         // fund bridgeSigner
         /* uint _bridgeSignerDepositAmount;
         if (amount > 100_000) {
@@ -339,7 +345,7 @@ contract BridgeERC20_test is BaseTest {
 
         vm.stopPrank();
         // DEFAULT_ADMIN_ROLE can bypass this
-        uint amountToDepositAsAdmin = 1_000_000;
+        uint amountToDepositAsAdmin = 1_000_000 ether;
         bridgeERC20.mintToken(address(token), address(this), amountToDepositAsAdmin, "test4");
         token.approve(address(bridgeERC20), amountToDepositAsAdmin);
         bridgeERC20.depositERC20(address(token), amountToDepositAsAdmin, targetChainId);
@@ -360,7 +366,7 @@ contract BridgeERC20_test is BaseTest {
         bridgeERC20.setFeeStatus(burnOnDeposit);
         // set fees
         vm.prank(operator);
-        bridgeERC20.setTokenFees(address(token), 100, 100, targetChainId);
+        bridgeERC20.setTokenFees(address(token), tokenFee, tokenFee, targetChainId);
         // set ETH fee
         uint _ethFee = 0.01 ether;
         vm.prank(operator);
@@ -383,5 +389,140 @@ contract BridgeERC20_test is BaseTest {
         } else {
             bridgeERC20.depositERC20(address(token), amount, targetChainId);
         }
+    }
+
+    function test_withdrawERC20(uint tokenAmount, bool feeActive) public {
+        vm.assume(tokenAmount > 0);
+        vm.assume(tokenAmount <= 100 ether);
+
+        uint targetChainId = block.chainid;
+        uint tokenFee = 100;
+
+        // create token
+        vm.prank(bridgeSigner);
+        token = base_erc20(createToken());
+        // set token details
+        vm.prank(operator);
+        bridgeERC20.setERC20Details(
+            address(token), true, true,
+            tokenFee, tokenFee, 100_000 ether,
+            100_000 ether, 1_000_000 ether, 1_000_000 ether,
+            targetChainId
+        );
+
+    // only admin or bridge can call this
+        vm.prank(user1);
+        vm.expectRevert(ERC20BridgeImpl.NotAuthorized.selector);
+        bridgeERC20.withdrawERC20(address(token), user1, tokenAmount, "test");
+
+    // bridge must be active
+        vm.prank(bridgeSigner);
+        vm.expectRevert(ERC20BridgeImpl.BridgeIsPaused.selector);
+        bridgeERC20.withdrawERC20(address(token), user1, tokenAmount, "test");
+
+        vm.prank(operator);
+        bridgeERC20.setBridgeStatus(true);
+
+    // ERC20 token must be allowed to use bridge
+        vm.prank(bridgeSigner);
+        vm.expectRevert(ERC20BridgeImpl.TokenNotSupported.selector);
+        bridgeERC20.withdrawERC20(address(123456), user1, tokenAmount, "test");
+
+    // bridge must not have reached the max 24h withdraw amount (bridge limit only)
+        uint _snap = vm.snapshot();
+        uint amountToDepositAsBSigner = 100_000 ether;
+        // enable chainId
+        vm.prank(operator);
+        bridgeERC20.setSupportedChain(targetChainId, true);
+
+        // fund bridge with 2m tokens - test only
+        bridgeERC20.mintToken(address(token), address(bridgeERC20), amountToDepositAsBSigner * 2, "test2");
+
+        // withdraw with BRIDGE role should fail if the bridge has reached the limit
+        vm.prank(bridgeSigner);
+        // this withdraw will reach the limit
+        bridgeERC20.withdrawERC20(address(token), user1, amountToDepositAsBSigner, "test3");
+        // this withdraw will fail
+        vm.prank(bridgeSigner);
+        vm.expectRevert(abi.encodeWithSelector(ERC20BridgeImpl.TooManyTokensToWithdraw.selector, amountToDepositAsBSigner));
+        bridgeERC20.withdrawERC20(address(token), user1, amountToDepositAsBSigner + 1, "test4");
+        // but the admin can bypass this
+        bridgeERC20.mintToken(address(token), address(bridgeERC20), 2, "test3");
+        bridgeERC20.withdrawERC20(address(token), user1, amountToDepositAsBSigner + 1, "test4");
+        // cannot withdraw again with the same uniqueKey
+        vm.expectRevert(ERC20BridgeImpl.UniqueKeyUsed.selector);
+        bridgeERC20.withdrawERC20(address(token), user1, 1, "test4");
+
+        vm.revertTo(_snap);
+
+        // enable chainId
+        vm.prank(operator);
+        bridgeERC20.setSupportedChain(targetChainId, true);
+        if(feeActive) {
+            // set fees
+            vm.startPrank(operator);
+            bridgeERC20.setTokenFees(address(token), tokenFee, tokenFee, targetChainId);
+            bridgeERC20.setFeeStatus(true);
+            // set ETH fee
+            uint _ethFee = 0.01 ether;
+            bridgeERC20.setETHFee(targetChainId, true, _ethFee);
+            // set token details
+            bridgeERC20.setERC20Details(
+                address(token), true, true,
+                tokenFee, tokenFee, 100_000 ether,
+                100_000 ether, 1_000_000 ether, 1_000_000 ether,
+                targetChainId
+            );
+            vm.stopPrank();
+        }
+
+        // deposit 100k tokens to withdraw them
+        bridgeERC20.mintToken(address(token), address(bridgeERC20), amountToDepositAsBSigner, "test5");
+        
+        // withdraw
+        bridgeERC20.withdrawERC20(address(token), user1, amountToDepositAsBSigner, "test6");
+        uint fee = amountToDepositAsBSigner * tokenFee / 10000;
+        if(feeActive) {
+            console.log("yes fee");
+            assertEq(token.balanceOf(user1), amountToDepositAsBSigner - fee);
+        } else {
+            console.log("no fee");
+            assertEq(token.balanceOf(user1), amountToDepositAsBSigner);
+        }
+    }
+
+    function test_burnToken(uint amount) public {
+        vm.assume(amount > 0);
+        vm.assume(amount <= 100 ether);
+
+        uint targetChainId = block.chainid;
+        uint tokenFee = 100;
+
+        // create token
+        vm.prank(bridgeSigner);
+        token = base_erc20(createToken());
+        // set token details
+        vm.prank(operator);
+        bridgeERC20.setERC20Details(
+            address(token), true, true,
+            tokenFee, tokenFee, 100_000 ether,
+            100_000 ether, 1_000_000 ether, 100_000 ether,
+            targetChainId
+        );
+
+        // only admin or bridge can call this
+        vm.prank(user1);
+        vm.expectRevert(ERC20BridgeImpl.NotAuthorized.selector);
+        bridgeERC20.burnToken(address(token), amount);
+
+    // bridge role has burn limits
+        // mint 100k tokens to bridge and then burn them so we are at the limit
+        vm.startPrank(bridgeSigner);
+        bridgeERC20.mintToken(address(token), address(bridgeERC20), 100_000 ether, "test1");
+        bridgeERC20.burnToken(address(token), 100_000 ether);
+        // try to burn again
+        bridgeERC20.mintToken(address(token), address(bridgeERC20), 100_000 ether, "test2");
+        vm.expectRevert(abi.encodeWithSelector(ERC20BridgeImpl.TooManyTokensToBurn.selector, 100_000 ether));
+        bridgeERC20.burnToken(address(token), 100_000 ether);
     }
 }

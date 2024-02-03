@@ -22,7 +22,7 @@ contract base_erc20 is ERC20, Ownable, ERC20Capped {
      */
     constructor(string memory _name, string memory _symbol, uint _totalSupply, uint8 decimals_) 
     ERC20(_name, _symbol)
-    ERC20Capped(_totalSupply * 10 ** decimals_)
+    ERC20Capped(_totalSupply)
     Ownable(msg.sender)
     {
         _decimals = decimals_;

@@ -3,7 +3,6 @@ pragma solidity 0.8.23;
 
 import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import { base_erc20 } from "./base_erc20.sol";
-import { console2 as console } from "forge-std/console2.sol";
 import { AccessControlUpgradeable } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
@@ -13,7 +12,7 @@ interface IERC20 {
     function transfer(address recipient, uint amount) external returns (bool);
     function transferFrom(address sender, address recipient, uint amount) external returns (bool);
     function allowance(address owner, address spender) external view returns (uint);
-    function burn(uint amount) external returns (bool);
+    function burn(uint amount) external;
 }
 
 /**
@@ -85,6 +84,7 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     event FeeReceiverSet(address indexed feeReceiver);
     event ETHFeeSet(uint chainId, bool active, uint amount);
     event ETHFeeCollected(uint amount);
+    event ChainSupportUpdated(uint chainId, bool status);
     // token events
     event TokenEdited(address indexed tokenAddress, uint maxDeposit, uint maxWithdraw, uint max24hDeposits, uint max24hWithdraws);
     event TokenDeposited(address indexed tokenAddress, address indexed user, uint amount, uint fee, uint chainId);
@@ -138,6 +138,7 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
      */
     function setSupportedChain(uint chainId, bool status) external onlyRole(OPERATOR) {
         supportedChains[chainId] = status;
+        emit ChainSupportUpdated(chainId, status);
     }
 
     /**
@@ -351,12 +352,12 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             }
         }
 
-        // transfer tokens to user
-        if(!IERC20(tokenAddress).transfer(userAddress, amount)) revert TokenTransferError();
         // transfer fees to feeReceiver
         if(feeAmount != 0) {
             if(!IERC20(tokenAddress).transfer(feeReceiver, feeAmount)) revert TokenTransferError();
         }
+        // transfer tokens to user
+        if(!IERC20(tokenAddress).transfer(userAddress, amount)) revert TokenTransferError();
         
         emit TokenWithdrawn(tokenAddress, userAddress, amount, feeAmount, block.chainid, uniqueKey);
     }
@@ -393,7 +394,7 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
 
     function createNewToken(string memory _name, string memory _symbol, uint _totalSupply, uint8 _decimals) external returns(address) {
         // only operator or bridge can call this
-        if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert NotAuthorized();
+        if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(BRIDGE, msg.sender)) revert NotAuthorized();
         return(address(new base_erc20(_name, _symbol, _totalSupply, _decimals)));
     }
 
@@ -422,12 +423,12 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     function burnToken(address _tokenAddress, uint _amount) public {
         // only admin or bridge can call this
         if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(BRIDGE, msg.sender)) revert NotAuthorized();
-        // bridge role has mint limits
+        // bridge role has burn limits
         if(hasRole(BRIDGE, msg.sender)) {
             ERC20Contracts storage token    = tokens[_tokenAddress];
             uint currentDay = block.timestamp / 1 days;
             uint currentBurnedAmount = dailyBurns[_tokenAddress][currentDay];
-            // bridge must not have reached the max 24h mint amount (bridge limit only)
+            // bridge must not have reached the max 24h burn amount (bridge limit only)
             if (currentBurnedAmount + _amount > token.max24hburns) revert TooManyTokensToBurn(token.max24hburns);
             // set daily burn amount
             dailyBurns[_tokenAddress][currentDay] += _amount;

@@ -1,8 +1,8 @@
 # base_erc20
-[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/f2b769fdce542ef2e944020280170c83fef0a8d2/src\base_erc20.sol)
+[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/3e5a779ec1e6e9f1446a661d20d8a2fa3693d839/src\base_erc20.sol)
 
 **Inherits:**
-ERC20, Ownable
+ERC20, Ownable, ERC20Capped
 
 Contract used to mint the base token for the bridge
 
@@ -22,7 +22,10 @@ total supply is minted on deployment to the deployer address who is the owner of
 
 
 ```solidity
-constructor(string memory _name, string memory _symbol, uint256 _totalSupply, uint8 decimals_) ERC20(_name, _symbol);
+constructor(string memory _name, string memory _symbol, uint256 _totalSupply, uint8 decimals_)
+    ERC20(_name, _symbol)
+    ERC20Capped(_totalSupply)
+    Ownable(msg.sender);
 ```
 **Parameters**
 
@@ -113,4 +116,11 @@ function burn(uint256 amount) external;
 |----|----|-----------|
 |`amount`|`uint256`|amount of tokens to be burned|
 
+
+### _update
+
+
+```solidity
+function _update(address from, address to, uint256 amount) internal override(ERC20, ERC20Capped);
+```
 

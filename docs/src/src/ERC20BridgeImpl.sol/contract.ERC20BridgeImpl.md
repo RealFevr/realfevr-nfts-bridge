@@ -1,5 +1,5 @@
 # ERC20BridgeImpl
-[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/f2b769fdce542ef2e944020280170c83fef0a8d2/src\ERC20BridgeImpl.sol)
+[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/3e5a779ec1e6e9f1446a661d20d8a2fa3693d839/src\ERC20BridgeImpl.sol)
 
 **Inherits:**
 AccessControlUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable
@@ -468,6 +468,12 @@ event ETHFeeSet(uint256 chainId, bool active, uint256 amount);
 
 ```solidity
 event ETHFeeCollected(uint256 amount);
+```
+
+### ChainSupportUpdated
+
+```solidity
+event ChainSupportUpdated(uint256 chainId, bool status);
 ```
 
 ### TokenEdited

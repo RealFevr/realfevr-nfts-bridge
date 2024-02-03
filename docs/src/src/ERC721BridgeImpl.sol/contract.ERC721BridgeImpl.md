@@ -1,5 +1,5 @@
 # ERC721BridgeImpl
-[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/f2b769fdce542ef2e944020280170c83fef0a8d2/src\ERC721BridgeImpl.sol)
+[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/3e5a779ec1e6e9f1446a661d20d8a2fa3693d839/src\ERC721BridgeImpl.sol)
 
 **Inherits:**
 ERC721Holder, AccessControlUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable
@@ -312,7 +312,7 @@ deposit an ERC721 token to the bridge
 
 
 ```solidity
-function depositSingleERC721(address nftAddress, uint256 tokenId, uint256 targetChainId) public payable nonReentrant;
+function depositSingleERC721(address nftAddress, uint256 tokenId, uint256 targetChainId) public payable;
 ```
 **Parameters**
 
@@ -332,29 +332,6 @@ function depositMultipleERC721(address[] calldata nftAddress, uint256[] calldata
     payable
     nonReentrant;
 ```
-
-### temp_depositMultipleERC721
-
-deposit multiple ERC721 tokens to the bridge
-
-
-```solidity
-function temp_depositMultipleERC721(
-    address nftAddress,
-    address tokenAddress,
-    uint256[] memory tokenIds,
-    uint256 targetChainId
-) external payable nonReentrant;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`nftAddress`|`address`|address of the NFT contract|
-|`tokenAddress`|`address`|address of the ERC20 token to pay the fee|
-|`tokenIds`|`uint256[]`|uint[] of the NFT ids|
-|`targetChainId`|`uint256`||
-
 
 ### withdrawSingleERC721
 

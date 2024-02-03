@@ -8,4 +8,4 @@ remappings = [
     'hardhat=lib/forge-std/src/'
     ]
 [fuzz]
-runs = 256
+runs = 1000

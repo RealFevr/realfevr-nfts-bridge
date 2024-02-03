@@ -50,7 +50,6 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
     }
 
     struct NFT {
-        //bool canBeWithdrawn;
         address owner;
     }
 
@@ -241,7 +240,7 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
      * @param nftAddress address of the NFT contract
      * @param tokenId uint of the NFT id
      */
-    function depositSingleERC721(address nftAddress, uint tokenId, uint targetChainId) public payable nonReentrant {
+    function depositSingleERC721(address nftAddress, uint tokenId, uint targetChainId) public payable {
         // storage to access NFT Contract, NFT and erc20 details
         NFTContracts storage nftContract = permittedNFTs[nftAddress];
         NFT storage nft = nftListPerContract[nftAddress][tokenId];
@@ -292,74 +291,6 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
         // for each NFT, call depositSingleERC721
         for(uint i = 0; i < nftAddress.length; i++) {
             depositSingleERC721(nftAddress[i], tokenIds[i], targetChainId);
-        }
-    }
-
-    /**
-     * @notice deposit multiple ERC721 tokens to the bridge
-     * @param nftAddress address of the NFT contract
-     * @param tokenAddress address of the ERC20 token to pay the fee
-     * @param tokenIds uint[] of the NFT ids
-     */
-    function temp_depositMultipleERC721(address nftAddress, address tokenAddress, uint[] memory tokenIds, uint targetChainId) external payable nonReentrant {
-        uint nftQuantity = tokenIds.length;
-        // storage to access NFT Contract, NFT and erc20 details
-        NFTContracts storage nftContract = permittedNFTs[nftAddress];
-        ERC20Tokens storage erc20Token = permittedERC20s[tokenAddress];
-        ChainETHFee storage ethFee = ethDepositFee[0];
-        uint ethFeeAmount = ethFee.amount;
-
-        // bridge must be active
-        if(!isOnline) revert BridgeIsPaused();
-        // NFT contract must be allowed to use bridge
-        if (!nftContract.isActive) revert NFTContractNotActive();
-        // ERC20 token must be allowed to use bridge
-        if (!erc20Token.isActive) revert ERC20ContractNotActive();
-        // check if fees are active and > 0
-        if(ethFee.isActive && ethFeeAmount > 0) {
-            // check if user has enough ERC20 to pay for the bridge
-            if(msg.value != ethFeeAmount * nftQuantity) revert InsufficentETHAmountForFee(ethFeeAmount * nftQuantity);
-            // send ETH fee to feeReceiver
-            (bool success,) = feeReceiver.call{value: msg.value}("");
-            emit ETHFeeCollected(msg.value);
-            if (!success) revert ETHTransferError();
-        }
-        // user should deposit at least 1 NFT
-        if(nftQuantity == 0) revert NoNFTsToDeposit();
-        // user should deposit less than the max amount of NFTs per tx
-        if(nftQuantity > maxNFTsPerTx) revert TooManyNFTsToDeposit(maxNFTsPerTx);
-
-        uint bridgeCost;
-        uint fees = nftContract.feeDepositAmount;
-        address feeTokenAddress = nftContract.feeTokenAddress;
-
-        // if Fees are active, we add the fee to the bridge cost
-        if (feeActive && fees != 0) {
-            bridgeCost = fees * nftQuantity;
-            if (IERC20(feeTokenAddress).balanceOf(msg.sender) < bridgeCost) {
-                revert FeeTokenInsufficentBalance();
-            }
-            if (IERC20(feeTokenAddress).allowance(msg.sender, address(this)) < bridgeCost) {
-                revert FeeTokenNotApproved(feeTokenAddress, bridgeCost);
-            }
-            if(!IERC20(tokenAddress).transferFrom(msg.sender, feeReceiver, bridgeCost)) revert ERC20TransferError();
-        }
-
-        // loop through tokenIds
-        for (uint i = 0; i < nftQuantity;) {
-            // storage to access NFT details
-            NFT storage nft = nftListPerContract[nftAddress][tokenIds[i]];
-
-            // set NFT details
-            nft.owner = msg.sender;
-
-            // transfer NFT to contract
-            IERC721(nftAddress).transferFrom(msg.sender, address(this), tokenIds[i]);
-            // send event to oracle
-            emit NFTDeposited(nftAddress, msg.sender, tokenIds[i], bridgeCost / nftQuantity, targetChainId);
-            unchecked {
-                ++i;
-            }
         }
     }
 

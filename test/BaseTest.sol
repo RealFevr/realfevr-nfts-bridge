@@ -3,6 +3,7 @@ pragma solidity 0.8.23;
 import "forge-std/Test.sol";
 
 import { base_erc20 } from "../src/base_erc20.sol";
+import { base_erc721 } from "../src/base_erc721.sol";
 import { ERC20BridgeImpl } from "../src/ERC20BridgeImpl.sol";
 import { ERC721BridgeImpl } from "../src/ERC721BridgeImpl.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -23,6 +24,7 @@ contract BaseTest is Test {
     bytes32 public DEFAULT_ADMIN_ROLE = 0x00;
     
     base_erc20       public token         = base_erc20(address(0));
+    base_erc721      public nft           = base_erc721(address(0));
     ERC20BridgeImpl  public bridgeERC20   = ERC20BridgeImpl(address(0));
     ERC721BridgeImpl public bridgeERC721  = ERC721BridgeImpl(address(0));
 }
