@@ -1,5 +1,5 @@
 # ERC721BridgeImpl
-[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/3e5a779ec1e6e9f1446a661d20d8a2fa3693d839/src\ERC721BridgeImpl.sol)
+[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/8845fdcd48bce6d81d3e7f792dea13fedb977a3a/src\ERC721BridgeImpl.sol)
 
 **Inherits:**
 ERC721Holder, AccessControlUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable
@@ -503,6 +503,42 @@ function setMarketplaceDistributions(
 |`_tokenId`|`uint256`|uint of the NFT id|
 |`_marketplaceDistributionRates`|`uint16[]`|array of uint16 of the marketplace distribution rates|
 |`_marketplaceDistributionAddresses`|`address[]`|array of address of the marketplace distribution addresses|
+
+
+### setBaseURI
+
+set the base URI of the NFT contract
+
+*only operator can call this*
+
+
+```solidity
+function setBaseURI(address nftAddress, string calldata baseURI_) public onlyRole(OPERATOR);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`nftAddress`|`address`|address of the NFT contract|
+|`baseURI_`|`string`|string of the base URI|
+
+
+### changeOwnerNft
+
+change the owner of the NFT contract
+
+*only operator can call this*
+
+
+```solidity
+function changeOwnerNft(address nftAddress, address newOwner) public onlyRole(BRIDGE);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`nftAddress`|`address`|address of the NFT contract|
+|`newOwner`|`address`|address of the new owner|
 
 
 ## Events

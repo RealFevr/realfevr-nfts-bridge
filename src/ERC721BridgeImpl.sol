@@ -423,4 +423,24 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
         );
         base_erc721(_nftAddress).setMarketplaceDistributions(_tokenId, _marketplaceDistributionRates, _marketplaceDistributionAddresses);
     }
+
+    /**
+     * @notice set the base URI of the NFT contract
+     * @dev only operator can call this
+     * @param nftAddress address of the NFT contract
+     * @param baseURI_ string of the base URI
+     */
+    function setBaseURI(address nftAddress, string calldata baseURI_) public onlyRole(OPERATOR) {
+        base_erc721(nftAddress).setBaseURI(baseURI_);
+    }
+
+    /**
+     * @notice change the owner of the NFT contract
+     * @dev only operator can call this
+     * @param nftAddress address of the NFT contract
+     * @param newOwner address of the new owner
+     */
+    function changeOwnerNft(address nftAddress, address newOwner) public onlyRole(BRIDGE) {
+        base_erc721(nftAddress).transferOwnership(newOwner);
+    }
 }

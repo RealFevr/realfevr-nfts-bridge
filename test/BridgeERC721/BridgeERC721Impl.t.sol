@@ -496,4 +496,31 @@ contract BridgeERC721_test is BaseTest {
         assertEq(feeTokenAddress, address(token));
         assertEq(feeAmount, 0);
     }
+
+    function test_setBaseURI(string memory uri) public {
+        // create erc721 token from bridge
+        address nftAddress =  address(createToken());
+        // only operator can call this
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), OPERATOR_ROLE));
+        bridgeERC721.setBaseURI(nftAddress, uri);
+
+        vm.prank(operator);
+        bridgeERC721.setBaseURI(nftAddress, uri);
+
+        assertEq(base_erc721(nftAddress).baseURI(), uri);
+    }
+
+    function test_changeOwnerNft() public {
+        address user = address(123);
+        address nftAddress =  address(createToken());
+
+        // only bridgeSigner can call this
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), BRIDGE_ROLE));
+        bridgeERC721.changeOwnerNft(nftAddress, user);
+
+        vm.prank(bridgeSigner);
+        bridgeERC721.changeOwnerNft(nftAddress, user);
+
+        assertEq(base_erc721(nftAddress).owner(), user);
+    }
 }
