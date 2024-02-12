@@ -283,7 +283,7 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         uint feeAmount;
         // apply the fees if active and != 0
         if (feeActive){
-            feeAmount = calculateFees(token.feeDeposit[block.chainid], amount);
+            feeAmount = calculateFees(token.feeDeposit[targetChainId], amount);
             if(feeAmount != 0) {
                 amount -= feeAmount;
             }
