@@ -515,10 +515,10 @@ contract BridgeERC721_test is BaseTest {
         address nftAddress =  address(createToken());
 
         // only bridgeSigner can call this
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), BRIDGE_ROLE));
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), OPERATOR_ROLE));
         bridgeERC721.changeOwnerNft(nftAddress, user);
 
-        vm.prank(bridgeSigner);
+        vm.prank(operator);
         bridgeERC721.changeOwnerNft(nftAddress, user);
 
         assertEq(base_erc721(nftAddress).owner(), user);

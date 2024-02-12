@@ -440,7 +440,7 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
      * @param nftAddress address of the NFT contract
      * @param newOwner address of the new owner
      */
-    function changeOwnerNft(address nftAddress, address newOwner) public onlyRole(BRIDGE) {
+    function changeOwnerNft(address nftAddress, address newOwner) public onlyRole(OPERATOR) {
         base_erc721(nftAddress).transferOwnership(newOwner);
     }
 }
