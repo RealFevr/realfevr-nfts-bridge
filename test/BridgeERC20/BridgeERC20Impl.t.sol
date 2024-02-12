@@ -284,7 +284,7 @@ contract BridgeERC20_test is BaseTest {
         bridgeERC20.depositERC20(address(token), amount, targetChainId);
 
         // create token
-        vm.prank(bridgeSigner);
+        vm.prank(operator);
         token = base_erc20(createToken());
         // set token details
         vm.prank(operator);
@@ -399,7 +399,7 @@ contract BridgeERC20_test is BaseTest {
         uint tokenFee = 100;
 
         // create token
-        vm.prank(bridgeSigner);
+        vm.prank(operator);
         token = base_erc20(createToken());
         // set token details
         vm.prank(operator);
@@ -499,7 +499,7 @@ contract BridgeERC20_test is BaseTest {
         uint tokenFee = 100;
 
         // create token
-        vm.prank(bridgeSigner);
+        vm.prank(operator);
         token = base_erc20(createToken());
         // set token details
         vm.prank(operator);
