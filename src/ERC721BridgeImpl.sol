@@ -23,7 +23,6 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
     bool public feeActive;
     address public feeReceiver;
     uint public maxNFTsPerTx;
-    bool private _multiDeposit;
 
     mapping(uint chainId => ChainETHFee)     public ethDepositFee;
     mapping(address => NFTContracts)         public permittedNFTs;
@@ -92,6 +91,9 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
     event ERC721Minted(address indexed nftAddress, address indexed to, uint256 tokenId, string uniqueKey);
     // tokens
     event ERC20DetailsSet(bool isActive, address erc20ContractAddress);
+
+    // impl v2 storage
+    bool private _multiDeposit;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
