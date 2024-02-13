@@ -23,6 +23,7 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
     bool public feeActive;
     address public feeReceiver;
     uint public maxNFTsPerTx;
+    bool private _multiDeposit;
 
     mapping(uint chainId => ChainETHFee)     public ethDepositFee;
     mapping(address => NFTContracts)         public permittedNFTs;
@@ -260,8 +261,8 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
         if(!supportedChains[targetChainId]) revert ChainNotSupported();
 
 
-        // check if fees are active and > 0
-        if (ethFee.isActive && ethFeeAmount > 0) {
+        // check if fees are active and > 0 and it's not a multiDeposit
+        if (ethFee.isActive && ethFeeAmount > 0 && !_multiDeposit) {
             // check if user has enough ETH to pay for the bridge
             if(msg.value != ethFeeAmount) revert InsufficentETHAmountForFee(ethFeeAmount);
             // send ETH fee to feeReceiver
@@ -288,10 +289,20 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
     }
 
     function depositMultipleERC721(address[] calldata nftAddress, uint[] calldata tokenIds, uint targetChainId) external payable nonReentrant {
+            // check if user has enough ETH to pay for the bridge
+            uint _ethFeeAmount = ethDepositFee[targetChainId].amount;
+            uint _nftLength = nftAddress.length;
+            if(msg.value != _ethFeeAmount * _nftLength) revert InsufficentETHAmountForFee(_ethFeeAmount * _nftLength);
+        // we handle fees here
+        _multiDeposit = true;
+        (bool success,) = feeReceiver.call{value: msg.value}("");
+            emit ETHFeeCollected(msg.value);
+            if (!success) revert ETHTransferError();
         // for each NFT, call depositSingleERC721
-        for(uint i = 0; i < nftAddress.length; i++) {
+        for(uint i = 0; i < _nftLength; i++) {
             depositSingleERC721(nftAddress[i], tokenIds[i], targetChainId);
         }
+        _multiDeposit = false;
     }
 
     /**

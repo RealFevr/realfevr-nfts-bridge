@@ -402,6 +402,60 @@ contract BridgeERC721_test is BaseTest {
         bridgeERC721.depositMultipleERC721(nftAddress, tokenIds, targetChainId);
     }
 
+    function test_depositMultipleERC721_withFees() public {
+        // create new ERC20 token
+        token = new base_erc20(
+            "TestToken",
+            "TT",
+            1000000 ether,
+            18
+        );
+        uint targetChainId = 1;
+        // create new NFT Token
+        address nftAddress1 =  address(createToken());
+
+        // enable bridge
+        vm.startPrank(operator);
+        bridgeERC721.setBridgeStatus(true);
+
+        // set ETH fee to 0.01 ETH per NFT
+        uint _ethFee = 0.01 ether;
+        bridgeERC721.setETHFee(targetChainId, true, _ethFee);
+        // enable nft contract
+        bridgeERC721.setNFTDetails(true, nftAddress1, address(token), 0, 0);
+        // enable erc20 contract
+        bridgeERC721.setERC20Details(true, address(token));
+
+        // enable chain id
+        bridgeERC721.setSupportedChain(targetChainId, true);
+        vm.stopPrank();
+
+        
+        address[] memory nftAddress = new address[](2);
+        uint[] memory tokenIds = new uint[](2);
+        nftAddress[0] = nftAddress1;
+        nftAddress[1] = nftAddress1;
+        tokenIds[0] = 0;
+        tokenIds[1] = 1;
+        // mint the NFTs
+        uint16[] memory _marketplaceDistributionRates = new uint16[](1);
+        address[] memory _marketplaceDistributionAddresses = new address[](1);
+        _marketplaceDistributionRates[0] = 10000;
+        _marketplaceDistributionAddresses[0] = address(123);
+        vm.prank(bridgeSigner);
+        bridgeERC721.mintERC721(nftAddress1, address(this), 0, "test1", _marketplaceDistributionRates, _marketplaceDistributionAddresses);
+        vm.prank(bridgeSigner);
+        bridgeERC721.mintERC721(nftAddress1, address(this), 1, "test2", _marketplaceDistributionRates, _marketplaceDistributionAddresses);
+
+        // approve the bridge to spend the NFTs
+        base_erc721(nftAddress1).setApprovalForAll(address(bridgeERC721), true);
+        // not enough eth for the fees
+        vm.expectRevert(abi.encodeWithSelector(ERC721BridgeImpl.InsufficentETHAmountForFee.selector, _ethFee*2));
+        bridgeERC721.depositMultipleERC721(nftAddress, tokenIds, targetChainId);
+        // send enough eth for the fees
+        bridgeERC721.depositMultipleERC721{value:_ethFee*2}(nftAddress, tokenIds, targetChainId);
+    }
+
     function test_withdrawSingleERC721(uint tokenId) public {
         // create the NFT token
         address nftAddress =  address(createToken());
