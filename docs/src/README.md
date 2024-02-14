@@ -1,51 +1,24 @@
 # RealFevr bridge
 
 ### Requirements
-- HardHat from [here](https://hardhat.org/getting-started/#installation)
-- NodeJS from [here](https://nodejs.org/en/download/)
 - Foundry from [here](https://github.com/foundry-rs/foundry/)
 
-Scripts are made in HardHat (JS)
-Tests are made in Foundry (Solidity)
-
-### Description
-
-The following documentation describes the RealFevr bridge, which is used to move ERC721 assets between chains.
-
-![Logic call graph](https://i.ibb.co/5vx4tzW/Screenshot-2023-08-29-210316.png "logic graph")
-### Architecture
-
+## Architecture
 The bridge is composed of three main components:
 
 - The bridge contract, which is deployed on supported chains and it's the scope of this documentation.
 - The bridge UI, which is a web application that allows users to interact with the bridge contract.
 - The bridge server, which is a server that listens to events emitted by the bridge contract and performs the actual transfer of assets between chains.
 
-### Bridge contract specifications
+## Run Scripts
 
-The bridge contract is deployed on supported chains and has the following functionalities:
+```
+forge script forge script .\script\BridgeERC20Impl.s.sol:DeployAllAndSetBridgeERC20
+```
+to point a chain, add `-f "https://RPCLINK"` to the command
+to broadcast the transaction on chain, add `--broadcast` to the command
 
-- List of permitted ERC721 NFTs to be bridged
-- List of permitted ERC20 tokens to pay for bridge fees
-- Flag to pause the bridge of certain NFT contracts
-- Flag to pause the bridge
-- Flag to enable/disable bridge fees
-- Deposit function to bridge NFTs
-- Withdraw function to bridge back NFTs
-- Fee system based on single NFT contracts
-
-### Run Script
-
-To run scripts we use HardHat from Nomic Foundation. To install it, follow the instructions [here](https://hardhat.org/getting-started/#installation).
-or do `npm install` in the root folder
-
-To execute a script, run `npx hardhat run scripts/<script_name>.js --network <network_name>`
-
-If you want to dry-run your scripts (optionally forking a network configured in hardhat.config.js)
-You can simply do
-`npx hardhat run .\scripts\Bridge.js`
-
-### Run Tests
+## Run Tests
 
 To run tests we use Foundry from Paradigm. To install it, follow the instructions [here](https://book.getfoundry.sh/getting-started/installation)
 If you're using Windows you can download the binaries and add them to your PATH, without needing to install and compile the project.
@@ -55,333 +28,290 @@ Install the required libraries and edit the foundry.toml remapping based on your
 forge install foundry-rs/forge-std --no-commit
 forge install openzeppelin/openzeppelin-contracts --no-commit
 ```
-
 To execute a test, run `forge test`
+
+# ERC721 Bridge
 
 ## user usage actions (contract related)
 
 1. User approves the bridge contract to transfer the NFTs
-2. User calls depositSingleERC721 with the NFT address & tokenID (paying the fees in ERC20)
-3. Bridge signer listen and register the deposit event
-4. Bridge signer calls the setPermissionToWithdraw with the NFT address, user & tokenID to approve withdrawal
-5. User calls withdrawSingleERC721 with the NFT address & tokenID
-
-### approve the bridge contract to transfer the NFTs
-
-1. call approve on the NFT contract
-    ``` 
-    nftToken.approve(address(bridge), tokenId);
-    ```
-or 
-    ``` 
-    nftToken.setApprovalForAll(address(bridge), true);
-    ```
-
-### deposit a single NFT
-
-1. call depositSingleERC721 on the bridge contract
-    ``` 
-    bridge.depositSingleERC721({
-            nftAddress: address(nftToken), // address of the NFT contract
-            tokenId: tokenId // tokenId to be deposited
-        });
-    ```
-
-### deposit multiple NFTs
-
-1. call depositMultipleERC721 on the bridge contract
-    ``` 
-    bridge.depositMultipleERC721({
-            nftAddress: address(nftToken), // address of the NFT contract
-            tokenAddress: address(feeToken), // address of the ERC20 token used for fees
-            tokenIds: [tokenId1, tokenId2] // tokenIds to be deposited
-        });
-    ```
-
-### withdraw a single NFT
-
-1. approve the tokenId on the NFT contract
-    ``` 
-    nftToken.approve(address(bridge), tokenId);
-    ```
-    or 
-1. approve all the tokenId on the NFT contract
-    ```
-    nftToken.setApprovalForAll(address(bridge), true);
-    ```
-2. call withdrawSingleERC721 on the bridge contract
-    ``` 
-    bridge.withdrawSingleERC721({
-            nftContractAddress: address(nftToken), // address of the NFT contract
-            tokenId: tokenId // tokenId to be withdrawn
-        });
-    ```
-
-### withdraw multiple NFTs
-
-1. approve all the tokenId on the NFT contract
-    ``` 
-    nftToken.setApprovalForAll(address(bridge), true);
-    ```
-    or 
-1. approve the tokenId on the NFT contract
-    ```
-    nftToken.approve(address(bridge), tokenId1);
-    nftToken.approve(address(bridge), tokenId2);
-    ```
-2. call withdrawMultipleERC721 on the bridge contract
-    ``` 
-    bridge.withdrawMultipleERC721({
-            contractAddress: address(nftToken), // address of the NFT contract
-            tokenIds: [tokenId1, tokenId2] // tokenIds to be withdrawn
-        });
-    ```
+2. User calls depositSingleERC721 with the NFT address & tokenID (paying the fees in ERC20 & ETH if active)
+3. Bridge backend listen for and register the deposit event
+4. Bridge signer calls calls withdrawSingleERC721 with the NFT address & tokenID
 
 ## admin usage actions (contract related)
 
-The bridge has two authorization levels: operator and bridge signer. The operator can perform the following actions:
+### Initialization
 
-- Set which NFT contract can be bridged
-- Set which ERC20 token can be used to pay for bridge fees
-- Set the bridge fees
-- Set the bridge fees activation flag
-- Set the bridge pause flag
-- Set the bridge pause flag for specific NFT contracts
+To initialize the contract, the project owner needs to call the `initialize` function with the following parameters:
 
-### configure a new ERC721 contract for bridging
+- `_bridgeSigner`: Address of the signer of the bridge.
+- `_feeReceiver`: Address of the fee receiver.
+- `_operator`: Address of the operator.
 
-1. Deploy the bridge contract on the desired chain
-2. Deploy the ERC721 contract on the desired chain
-3. Set the NFT details on the bridge contract
-    ```
-    bridge.setNFTDetails({
-                        isActive: true, // if the bridge is active for this NFT
-                        nftContractAddress: address(nftToken), // address of the NFT contract
-                        feeTokenAddress: address(feeToken), // address of the ERC20 token used for fees
-                        depositFeeAmount: depositFee, // amount of ERC20 tokens to be paid for deposit
-                        withdrawFeeAmount: withdrawFee // amount of ERC20 tokens to be paid for withdrawal
-                    });
-    ```
-4. Activate the fees on the bridge contract
-    ```
-    bridge.setFeeStatus(true);
-    ```
-5. Setup the ERC20 token info
-    ```
-    bridge.setERC20Details({
-                    isActive: true, // if the bridge is active for this ERC20
-                    erc20ContractAddress: address(feeToken) // address of the ERC20 contract
-                });
-    ```
-6. Mint the NFTs that should be bridged by users on target chain
-7. Enable the bridge
-    ```
-    bridge.setBridgeStatus(true);
-    ```
+### Setting Supported Chains
 
-### add a new ERC20 token for fees on the bridge
+The operator can set the supported chains using the `setSupportedChain` function. This function accepts the `chainId` of the chain and a `status` (true/false) to enable or disable the chain.
 
-1. Deploy the ERC20 contract on the desired chain
-    ```
-    bridge.setERC20Details({
-                    isActive: true, // if the bridge is active for this ERC20
-                    erc20ContractAddress: address(feeToken) // address of the ERC20 contract
-                });
-    ```
+### Setting Max NFTs Per Transaction
 
-### enable/disable the bridge
+The operator can set the maximum number of NFTs that can be used in a single transaction using the `setMaxNFTsPerTx` function. This function accepts the `maxNFTsPerTx` parameter, which represents the maximum number of NFTs allowed per transaction.
 
-1. call setBridgeStatus with the desired flag
-    ```
-    bridge.setBridgeStatus(true);
-    ```
+### Setting Bridge Status
 
-### enable/disable the bridge for a specific NFT contract
+The operator can set the bridge status (online/offline) using the `setBridgeStatus` function. This function accepts a boolean value (`true` for online, `false` for offline) to activate or deactivate the bridge.
 
-1. call setNFTDetails and set the isActive flag to false
-    ```
-    bridge.setNFTDetails({
-                        isActive: false,
-                        nftContractAddress: address(nftToken), // same data as before
-                        feeTokenAddress: address(feeToken), // same data as before
-                        depositFeeAmount: depositFee, // same data as before
-                        withdrawFeeAmount: withdrawFee // same data as before
-                    });
-    ```
+### Setting Fee Status
 
-### enable/disable fees
+The operator can set the fee status (active/inactive) using the `setFeeStatus` function. This function accepts a boolean value (`true` for active, `false` for inactive) to activate or deactivate the fees.
 
-1. call setFeeStatus with the desired flag
-    ```
-    bridge.setFeeStatus(true);
-    ```
+### Setting ETH Fees
 
-### set the fees for the ERC20 token used as fees on an ERC721 contract
+The operator can set the ETH deposit fees for specific chain IDs using the `setETHFee` function. This function accepts the `chainId` of the chain, a boolean value (`true` for active, `false` for inactive), and the `amount` of the fee.
 
-1. call setTokenFees
-    ```
-    bridge.setTokenFees({
-            active: true, // if the fees are active
-            nftAddress: address(nftToken), // address of the NFT contract that pays fees with that ERC20
-            depositFee: _depositFee, // amount of ERC20 tokens to be paid for deposit
-            withdrawFee: _withdrawFee // amount of ERC20 tokens to be paid for withdrawal
-        });
-    ```
+### Setting Token Fees
 
-### set the address who receive the fees
+The operator can set the fees for ERC20 tokens using the `setTokenFees` function. This function accepts the following parameters:
 
-1. call setFeeReceiver
-    ```
-    bridge.setFeeReceiver(0x...);
-    ```
+- `active`: Boolean value (`true` for active, `false` for inactive) to activate or deactivate the fees.
+- `nftAddress`: Address of the NFT token.
+- `depositFee`: Fee amount for depositing the NFT token.
+- `withdrawFee`: Fee amount for withdrawing the NFT token.
 
+### Setting Fee Receiver
 
-## Bridge signer actions (contract related)
+The operator can set the address of the fee receiver using the `setFeeReceiver` function. This function accepts the `receiver` parameter, which represents the address of the fee receiver.
 
-The bridge signer can perform the following actions:
+### Setting NFT Details
 
-- Set the withdrawal state of a specific NFT token for a specific user
-- Create an ERC721 contract
-- Mint a specific tokenId on bridge-created ERC721 contracts
-- Set permission to withdraw to an user and create the ERC721 contract (not yet fully tested as time of writing this documentation)
+The operator can set the details of an NFT address using the `setNFTDetails` function. This function accepts the following parameters:
 
-### create an ERC721 contract
+- `isActive`: Boolean value (`true` for active, `false` for inactive) to activate or deactivate the NFT contract.
+- `nftContractAddress`: Address of the NFT contract.
+- `feeTokenAddress`: Address of the token used to pay the fee.
+- `depositFeeAmount`: Deposit fee amount for the NFT contract.
+- `withdrawFeeAmount`: Withdraw fee amount for the NFT contract.
 
-1. call createERC721
-    ```
-    bridge.createERC721({
-            uri: "ipfs://baseHASH/", // url of the metadata root folder
-            name: "TestNFT", // name of the NFT contract
-            symbol: "TNFT" // symbol of the NFT contract
-        });
-    ```
+### Setting ERC20 Details
 
-### mint a specific tokenId on bridge-created ERC721 contracts
+The operator can set the details of an ERC20 address using the `setERC20Details` function. This function accepts the following parameters:
 
-1. call mintERC721
-    ```
-    bridge.mintERC721({
-            nftAddress: newNFT, // address of the NFT contract
-            to: user1, // address of the user that will receive the NFT
-            tokenId: 0 // tokenId to be minted
-        });
-    ```
+- `isActive`: Boolean value (`true` for active, `false` for inactive) to activate or deactivate the ERC20 contract.
+- `erc20ContractAddress`: Address of the ERC20 contract.
 
-### set permission to withdraw to an user and create the ERC721 contract
+### Withdrawing ERC721 Tokens
 
-1. call setPermissionToWithdrawAndCreateERC721
-    ```
-    bridge.setPermissionToWithdrawAndCreateERC721({
-            owner: user1, // address of the user that will receive the NFT
-            tokenId: 0, // tokenId to be minted
-            uri: "ipfs://uriz/", // url of the metadata root folder
-            name: "TestNFT", // name of the NFT contract
-            symbol: "TNFT" // symbol of the NFT contract
-        });
-    ```
+The bridge signer can withdraw ERC721 tokens from the bridge using the `withdrawSingleERC721` function. This function requires the following parameters:
 
-### general view functions
+- `to`: Address of the user to withdraw to.
+- `nftContractAddress`: Address of the NFT contract.
+- `tokenId`: ID of the NFT token.
+- `uniqueKey`: Unique key associated with the withdrawal.
 
-1. getDepositFeeAddressAndAmount
-    ```
-    bridge.getDepositFeeAddressAndAmount(nftTokenAddr) // address of the NFT contract
-    ```
-    will return the address of the ERC20 token used for fees and the amount of fees to be paid for deposit
+### Minting ERC721 Tokens
 
-2. permittedNFTs
-    ```
-    bridge.permittedNFTs(nftTokenAddr); // address of the NFT contract
-    ```
-    will return the following struct
-    ```
-    struct NFTContracts {
-        bool isActive;
-        address contractAddress;
-        address feeTokenAddress;
-        uint feeDepositAmount;
-        uint feeWithdrawAmount;
-    }
-    ```
+The bridge signer can mint ERC721 tokens using the `mintERC721` function. This function requires the following parameters:
 
-3. permittedERC20s
-    ```
-    bridge.permittedERC20s(feeToken); // address of the ERC20 contract
-    ```
-    will return the following struct
-    ```
-    struct ERC20Contracts {
-        bool isActive;
-        address contractAddress;
-    }
-    ```
+- `nftAddress`: Address of the NFT contract.
+- `to`: Address of the user to mint to.
+- `tokenId`: ID of the NFT token.
+- `uniqueKey`: Unique key associated with the minting.
+- `_marketplaceDistributionRates`: Array of `uint16` values representing the marketplace distribution rates.
+- `_marketplaceDistributionAddresses`: Array of addresses representing the marketplace distribution addresses.
 
-4. nftListPerContract
-    ```
-    bridge.nftListPerContract(nftTokenAddress, 0); // 0 is the index of the tokenId
-    ```
-    will return the following struct
-    ```
-    struct NFT {
-        bool canBeWithdrawn;
-        address owner;
-    }
-    ```
-    canBeWithdrawn is true if the tokenId can be withdrawn by the owner
-    owner is the address of the owner of the tokenId in the bridge
+### Setting Base URI
 
-### Contracts Description Table (auto generated)
+The operator can set the base URI of an NFT contract using the `setBaseURI` function. This function requires the following parameters:
 
+- `nftAddress`: Address of the NFT contract.
+- `baseURI_`: Base URI string.
+
+### Changing NFT Contract Owner
+
+The operator can change the owner of an NFT contract using the `changeOwnerNft` function. This function requires the following parameters:
+
+- `nftAddress`: Address of the NFT contract.
+- `newOwner`: Address of the new owner.
+
+# ERC20 Bridge
+
+## Initialization
+
+To initialize the contract, the project owner needs to call the `initialize` function with the following parameters:
+
+- `_bridgeSigner`: Address of the signer of the bridge.
+- `_feeReceiver`: Address of the fee receiver.
+- `_operator`: Address of the operator.
+
+## Setting Supported Chains
+
+The operator can set the supported chains using the `setSupportedChain` function. This function accepts the `chainId` of the chain and a `status` (true/false) to enable or disable the chain.
+
+## Setting Bridge Status
+
+The operator can set the bridge status (online/offline) using the `setBridgeStatus` function. This function accepts a boolean value to activate or deactivate the bridge.
+
+## Setting Fee Status
+
+The operator can set the bridge fee status (active/inactive) using the `setFeeStatus` function. This function accepts a boolean value to activate or deactivate the fees.
+
+## Setting ETH Fee
+
+The operator can set the ETH fee for a specific chain using the `setETHFee` function. This function accepts the `chainId` of the chain, a boolean value to activate or deactivate the fees, and the fee amount.
+
+## Setting Token Fees
+
+The operator can set the fees for ERC20 tokens using the `setTokenFees` function. This function accepts the `tokenAddress` of the token contract, the deposit fee amount, the withdraw fee amount, and the target chain id.
+
+## Setting Fee Receiver
+
+The operator can set the fee receiver address using the `setFeeReceiver` function. This function accepts the `receiver` address.
+
+## Setting ERC20 Details
+
+The operator can set the settings of an ERC20 token using the `setERC20Details` function. This function accepts the `tokenAddress` of the ERC20 contract, a boolean value to activate or deactivate the contract, a boolean value to burn the tokens on deposit, the deposit fee amount, the withdraw fee amount, the maximum deposit amount per 24 hours, the maximum withdraw amount per 24 hours, the maximum mint amount per 24 hours, the maximum burn amount per 24 hours, and the target chain id.
+
+## Depositing ERC20 Tokens
+
+Users can deposit ERC20 tokens to the bridge by calling the `depositERC20` function. This function accepts the `tokenAddress` of the token contract, the token amount, and the target chain id.
+
+## Withdrawing ERC20 Tokens
+
+The bridge can withdraw ERC20 tokens by calling the `withdrawERC20` function. This function accepts the `tokenAddress` of the token contract, the user address, the token amount, and a unique key.
+
+## Getting Deposit Fee Amount
+
+The project owner can get the amount of deposit fees for a given ERC20 contract by calling the `getDepositFeeAmount` function. This function accepts the `contractAddress` of the ERC20 contract and the target chain id.
+
+## Getting Withdraw Fee Amount
+
+The project owner can get the amount of withdraw fees for a given ERC20 contract by calling the `getWithdrawFeeAmount` function. This function accepts the `contractAddress` of the ERC20 contract and the target chain id.
+
+### Contracts Table
 
 |  Contract  |         Type        |       Bases      |                  |                 |
 |:----------:|:-------------------:|:----------------:|:----------------:|:---------------:|
 |     └      |  **Function Name**  |  **Visibility**  |  **Mutability**  |  **Modifiers**  |
 ||||||
-| **MasterBridge** | Implementation | ERC721Holder, AccessControl, ReentrancyGuard |||
+| **ERC721BridgeImpl** | Implementation | ERC721Holder, AccessControlUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable |||
 | └ | <Constructor> | Public ❗️ | 🛑  |NO❗️ |
+| └ | _authorizeUpgrade | Internal 🔒 | 🛑  | onlyRole |
+| └ | initialize | External ❗️ | 🛑  | initializer |
+| └ | setSupportedChain | External ❗️ | 🛑  | onlyRole |
 | └ | setMaxNFTsPerTx | External ❗️ | 🛑  | onlyRole |
 | └ | setBridgeStatus | External ❗️ | 🛑  | onlyRole |
 | └ | setFeeStatus | External ❗️ | 🛑  | onlyRole |
+| └ | setETHFee | External ❗️ | 🛑  | onlyRole |
 | └ | setTokenFees | External ❗️ | 🛑  | onlyRole |
 | └ | setFeeReceiver | External ❗️ | 🛑  | onlyRole |
 | └ | setNFTDetails | External ❗️ | 🛑  | onlyRole |
 | └ | setERC20Details | External ❗️ | 🛑  | onlyRole |
-| └ | setPermissionToWithdraw | Public ❗️ | 🛑  | onlyRole |
-| └ | setMultiplePermissionsToWithdraw | External ❗️ | 🛑  | onlyRole |
-| └ | depositSingleERC721 | External ❗️ | 🛑  | nonReentrant |
-| └ | depositMultipleERC721 | External ❗️ | 🛑  | nonReentrant |
-| └ | withdrawSingleERC721 | External ❗️ | 🛑  | nonReentrant |
-| └ | withdrawMultipleERC721 | External ❗️ | 🛑  | nonReentrant |
+| └ | depositSingleERC721 | Public ❗️ |  💵 |NO❗️ |
+| └ | depositMultipleERC721 | External ❗️ |  💵 | nonReentrant |
+| └ | withdrawSingleERC721 | Public ❗️ | 🛑  | onlyRole |
+| └ | withdrawMultipleERC721 | External ❗️ | 🛑  | onlyRole |
 | └ | takeFees | Private 🔐 | 🛑  | |
 | └ | getDepositFeeAddressAndAmount | External ❗️ |   |NO❗️ |
 | └ | createERC721 | Public ❗️ | 🛑  | onlyRole |
 | └ | mintERC721 | Public ❗️ | 🛑  | onlyRole |
-| └ | setPermissionToWithdrawAndCreateERC721 | External ❗️ | 🛑  | onlyRole |
+| └ | setMarketplaceDistributions | Public ❗️ | 🛑  | onlyRole |
+| └ | setBaseURI | Public ❗️ | 🛑  | onlyRole |
+| └ | changeOwnerNft | Public ❗️ | 🛑  | onlyRole |
 ||||||
 | **base_erc721** | Implementation | ERC721, Ownable |||
-| └ | <Constructor> | Public ❗️ | 🛑  | ERC721 |
+| └ | <Constructor> | Public ❗️ | 🛑  | ERC721 Ownable |
 | └ | safeMint | Public ❗️ | 🛑  | onlyOwner |
 | └ | safeMintTo | Public ❗️ | 🛑  | onlyOwner |
 | └ | setBaseURI | Public ❗️ | 🛑  | onlyOwner |
+| └ | setMarketplaceDistributions | External ❗️ | 🛑  | onlyOwner |
 | └ | _baseURI | Internal 🔒 |   | |
+| └ | getMarketplaceDistributionForERC721 | External ❗️ |   |NO❗️ |
 ||||||
-| **MasterBridgeTest** | Implementation | Test |||
+| **BridgeERC721_test** | Implementation | BaseTest |||
 | └ | setUp | Public ❗️ | 🛑  |NO❗️ |
-| └ | test_cross_chain_deposit | Public ❗️ | 🛑  |NO❗️ |
+| └ | createToken | Public ❗️ | 🛑  |NO❗️ |
+| └ | onERC721Received | Public ❗️ |   |NO❗️ |
+| └ | test_check_deployment_initialization | Public ❗️ | 🛑  |NO❗️ |
+| └ | test_setSupportedChain | Public ❗️ | 🛑  |NO❗️ |
+| └ | test_setMaxNFTsPerTx | Public ❗️ | 🛑  |NO❗️ |
 | └ | test_setBridgeStatus | Public ❗️ | 🛑  |NO❗️ |
 | └ | test_setFeeStatus | Public ❗️ | 🛑  |NO❗️ |
-| └ | test_withdraw | Public ❗️ | 🛑  |NO❗️ |
-| └ | test_maxNFTs | Public ❗️ | 🛑  |NO❗️ |
+| └ | test_setETHFee | Public ❗️ | 🛑  |NO❗️ |
 | └ | test_setTokenFees | Public ❗️ | 🛑  |NO❗️ |
-| └ | test_createERC721 | Public ❗️ | 🛑  |NO❗️ |
-| └ | test_mintERC721 | Public ❗️ | 🛑  |NO❗️ |
-| └ | test_setPermissionToWithdrawAndCreateERC721 | Public ❗️ | 🛑  |NO❗️ |
+| └ | test_setFeeReceiver | Public ❗️ | 🛑  |NO❗️ |
+| └ | test_setNFTDetails | Public ❗️ | 🛑  |NO❗️ |
+| └ | test_setERC20Details | Public ❗️ | 🛑  |NO❗️ |
+| └ | test_depositSingleERC721 | Public ❗️ | 🛑  |NO❗️ |
+| └ | test_depositMultipleERC721 | Public ❗️ | 🛑  |NO❗️ |
+| └ | test_depositMultipleERC721_withFees | Public ❗️ | 🛑  |NO❗️ |
+| └ | test_withdrawSingleERC721 | Public ❗️ | 🛑  |NO❗️ |
+| └ | test_withdrawMultipleERC721 | Public ❗️ | 🛑  |NO❗️ |
+| └ | test_getDepositFeeAddressAndAmount | Public ❗️ | 🛑  |NO❗️ |
+| └ | test_setBaseURI | Public ❗️ | 🛑  |NO❗️ |
+| └ | test_changeOwnerNft | Public ❗️ | 🛑  |NO❗️ |
 ||||||
-| **base_erc20** | Implementation | ERC20, Ownable |||
-| └ | <Constructor> | Public ❗️ | 🛑  | ERC20 |
+| **BaseTest** | Implementation | Test |||
+||||||
+| **base_erc20** | Implementation | ERC20, Ownable, ERC20Capped |||
+| └ | <Constructor> | Public ❗️ | 🛑  | ERC20 ERC20Capped Ownable |
 | └ | decimals | Public ❗️ |   |NO❗️ |
 | └ | airdrop | External ❗️ | 🛑  |NO❗️ |
 | └ | airdropD | External ❗️ | 🛑  |NO❗️ |
-| └ | burnUserTokens | External ❗️ | 🛑  | onlyOwner |
+| └ | mint | External ❗️ | 🛑  | onlyOwner |
+| └ | burn | External ❗️ | 🛑  |NO❗️ |
+| └ | _update | Internal 🔒 | 🛑  | |
+||||||
+| **IERC20** | Interface |  |||
+| └ | decimals | External ❗️ |   |NO❗️ |
+| └ | balanceOf | External ❗️ |   |NO❗️ |
+| └ | transfer | External ❗️ | 🛑  |NO❗️ |
+| └ | transferFrom | External ❗️ | 🛑  |NO❗️ |
+| └ | allowance | External ❗️ |   |NO❗️ |
+| └ | burn | External ❗️ | 🛑  |NO❗️ |
+||||||
+| **ERC20BridgeImpl** | Implementation | AccessControlUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable |||
+| └ | <Constructor> | Public ❗️ | 🛑  |NO❗️ |
+| └ | _authorizeUpgrade | Internal 🔒 | 🛑  | onlyRole |
+| └ | initialize | External ❗️ | 🛑  | initializer |
+| └ | setSupportedChain | External ❗️ | 🛑  | onlyRole |
+| └ | setBridgeStatus | External ❗️ | 🛑  | onlyRole |
+| └ | setFeeStatus | External ❗️ | 🛑  | onlyRole |
+| └ | setETHFee | External ❗️ | 🛑  | onlyRole |
+| └ | setTokenFees | External ❗️ | 🛑  | onlyRole |
+| └ | setFeeReceiver | External ❗️ | 🛑  | onlyRole |
+| └ | setERC20Details | External ❗️ | 🛑  | onlyRole |
+| └ | depositERC20 | External ❗️ |  💵 | nonReentrant |
+| └ | withdrawERC20 | External ❗️ | 🛑  | nonReentrant |
+| └ | calculateFees | Private 🔐 |   | |
+| └ | getDepositFeeAmount | External ❗️ |   |NO❗️ |
+| └ | getWithdrawFeeAmount | External ❗️ |   |NO❗️ |
+| └ | createNewToken | External ❗️ | 🛑  |NO❗️ |
+| └ | mintToken | Public ❗️ | 🛑  |NO❗️ |
+| └ | burnToken | Public ❗️ | 🛑  |NO❗️ |
+||||||
+| **Base** | Implementation | Script |||
+| └ | attachContracts | Public ❗️ | 🛑  |NO❗️ |
+| └ | deployBridge | Public ❗️ | 🛑  |NO❗️ |
+| └ | deployERC20 | Public ❗️ | 🛑  |NO❗️ |
+| └ | deployERC721 | Public ❗️ | 🛑  |NO❗️ |
+| └ | setNftDetails | Public ❗️ | 🛑  |NO❗️ |
+| └ | setERC20Details | Public ❗️ | 🛑  |NO❗️ |
+| └ | setBridgeStatus | Public ❗️ | 🛑  |NO❗️ |
+| └ | setFeeStatus | Public ❗️ | 🛑  |NO❗️ |
+| └ | setETHFee | Public ❗️ | 🛑  |NO❗️ |
+| └ | showAddresses | Public ❗️ |   |NO❗️ |
+||||||
+| **DeployAllAndSetBridgeERC721Impl** | Implementation | Base |||
+| └ | run | External ❗️ | 🛑  |NO❗️ |
+||||||
+| **DeployBridgeImpl** | Implementation | Base |||
+| └ | run | External ❗️ | 🛑  |NO❗️ |
+||||||
+| **UpgradeBridgeImpl** | Implementation | Base |||
+| └ | run | External ❗️ | 🛑  |NO❗️ |
+||||||
+| **DepositInBridgeERC721Impl** | Implementation | Base |||
+| └ | run | External ❗️ | 🛑  |NO❗️ |
 
 
  Legend

@@ -1,5 +1,5 @@
 # ERC721BridgeImpl
-[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/8845fdcd48bce6d81d3e7f792dea13fedb977a3a/src\ERC721BridgeImpl.sol)
+[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/37cd7fa929a344934951d0ced8e23240aacbf261/src\ERC721BridgeImpl.sol)
 
 **Inherits:**
 ERC721Holder, AccessControlUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable
@@ -99,6 +99,13 @@ mapping(string key => bool used) public mintUniqueKeys;
 
 ```solidity
 mapping(uint256 chainId => bool supported) public supportedChains;
+```
+
+
+### _multiDeposit
+
+```solidity
+bool private _multiDeposit;
 ```
 
 
@@ -531,7 +538,7 @@ change the owner of the NFT contract
 
 
 ```solidity
-function changeOwnerNft(address nftAddress, address newOwner) public onlyRole(BRIDGE);
+function changeOwnerNft(address nftAddress, address newOwner) public onlyRole(OPERATOR);
 ```
 **Parameters**
 
