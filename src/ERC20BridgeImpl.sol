@@ -152,9 +152,9 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     }
     
     /**
-     * @notice set the bridge fee statys
+     * @notice set the bridge fee status
      * @dev only operator can call this
-     * @param active bool to activate or deactivate the bridge
+     * @param active bool to activate or deactivate the bridge fees
      */
     function setFeeStatus(bool active) external onlyRole(OPERATOR) {
         feeActive = active;

@@ -156,9 +156,9 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
     }
 
     /**
-     * @notice set the bridge fee statys
+     * @notice set the bridge fee status
      * @dev only operator can call this
-     * @param active bool to activate or deactivate the bridge
+     * @param active bool to activate or deactivate the bridge fee
      */
     function setFeeStatus(bool active) external onlyRole(OPERATOR) {
         feeActive = active;
@@ -257,7 +257,7 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
         if (!nftContract.isActive) revert NFTContractNotActive();
         // ERC20 token must be allowed to use bridge
         if (!erc20Token.isActive) revert ERC20ContractNotActive();
-        // NFT must be owned by msg.sender - @audit can be removed for gas opt
+        // NFT must be owned by msg.sender
         if(IERC721(nftAddress).ownerOf(tokenId) != msg.sender) revert NFTNotOwnedByYou();
         // chain id must be supported
         if(!supportedChains[targetChainId]) revert ChainNotSupported();
@@ -392,7 +392,7 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
     function createERC721(string calldata uri, string calldata name, string calldata symbol) public onlyRole(OPERATOR) returns(address nftAddress) {
         base_erc721 newERC721 = new base_erc721(name, symbol);
         newERC721.setBaseURI(uri);
-        emit NFTDetailsSet(true, address(newERC721), address(0), 0);
+        emit NFTDetailsSet(false, address(newERC721), address(0), 0);
         return address(newERC721);
     }
 
