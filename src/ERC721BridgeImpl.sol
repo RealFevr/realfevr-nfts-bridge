@@ -411,8 +411,8 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
         // unique key must not be used before
         if(mintUniqueKeys[uniqueKey]) revert UniqueKeyUsed();
         mintUniqueKeys[uniqueKey] = true;
-        base_erc721(nftAddress).safeMintTo(to, tokenId);
         setMarketplaceDistributions(nftAddress, tokenId, _marketplaceDistributionRates, _marketplaceDistributionAddresses);
+        base_erc721(nftAddress).safeMintTo(to, tokenId);
         emit ERC721Minted(nftAddress, to, tokenId, uniqueKey);
     }
 
