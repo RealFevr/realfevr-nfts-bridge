@@ -33,7 +33,6 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     mapping(address tokenAddress => mapping(uint day => uint withdrawAmount))  public dailyWithdraws;
     mapping(address tokenAddress => mapping(uint day => uint mintAmount))      public dailyMints;
     mapping(address tokenAddress => mapping(uint day => uint burnAmount))      public dailyBurns;
-    mapping(address user =>         mapping(address tokenAddress => UserData)) public userData;
     mapping(address tokenAddress => ERC20Contracts)                            public tokens;
     mapping(string key => bool used)                                           public withdrawUniqueKeys;
     mapping(string key => bool used)                                           public mintUniqueKeys;
@@ -43,9 +42,6 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     struct ChainETHFee {
         bool isActive;
         uint amount;
-    }
-    struct UserData {
-        uint depositAmount;
     }
 
     struct ERC20Contracts {
@@ -259,7 +255,6 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
      */
     function depositERC20(address tokenAddress, uint amount, uint targetChainId) external payable nonReentrant {
         ERC20Contracts storage token     = tokens[tokenAddress];
-        UserData       storage _userData = userData[msg.sender][tokenAddress];
         ChainETHFee    storage ethFee    = ethDepositFee[targetChainId];
         uint ethFeeAmount = ethFee.amount;
         uint currentDay   = block.timestamp / 1 days;
@@ -298,8 +293,6 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             if (!success) revert ETHTransferError();
         }
 
-        // set user details
-        _userData.depositAmount += amount;
         // set daily deposit amount
         dailyDeposits[tokenAddress][currentDay] += amount;
         IERC20 _token = IERC20(tokenAddress);

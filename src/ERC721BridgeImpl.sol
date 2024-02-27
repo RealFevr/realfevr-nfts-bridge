@@ -27,7 +27,6 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
     mapping(uint chainId => ChainETHFee)     public ethDepositFee;
     mapping(address => NFTContracts)         public permittedNFTs;
     mapping(address => ERC20Tokens)          public permittedERC20s;
-    mapping(address => mapping(uint => NFT)) public nftListPerContract;
     mapping(string key => bool used)         public withdrawUniqueKeys;
     mapping(string key => bool used)         public mintUniqueKeys;
     mapping(uint chainId => bool supported)  public supportedChains;
@@ -246,7 +245,7 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
     function depositSingleERC721(address nftAddress, uint tokenId, uint targetChainId) public payable {
         // storage to access NFT Contract, NFT and erc20 details
         NFTContracts storage nftContract = permittedNFTs[nftAddress];
-        NFT storage nft = nftListPerContract[nftAddress][tokenId];
+       
         ERC20Tokens storage erc20Token = permittedERC20s[nftContract.feeTokenAddress];
         ChainETHFee storage ethFee = ethDepositFee[targetChainId];
         uint ethFeeAmount = ethFee.amount;
@@ -280,9 +279,6 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
         if (feeActive && feeAmount > 0) {
             bridgeCost = takeFees(feeTokenAddress, feeAmount, 1);
         }
-
-        // set NFT details
-        nft.owner = msg.sender;
         
         // transfer NFT to contract
         IERC721(nftAddress).safeTransferFrom(msg.sender, address(this), tokenId);
@@ -324,9 +320,6 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
         if(!isOnline) revert BridgeIsPaused();
         // NFT contract must be allowed to use bridge
         if (!nftContract.isActive) revert NFTContractNotActive();
-
-        // set NFT details
-        delete nftListPerContract[nftContractAddress][tokenId];
 
         // transfer NFT to user
         IERC721(nftContractAddress).transferFrom(address(this), to, tokenId);
