@@ -3,7 +3,7 @@ pragma solidity 0.8.23;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import { ERC721Holder } from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
+import { ERC721HolderUpgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
 import { AccessControlUpgradeable } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import { base_erc721 } from "./base_erc721.sol";
@@ -14,7 +14,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
  * @author Krakovia - t.me/karola96
  * @notice This contract is an erc721 bridge with optional fees
  */
-contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable {
+contract ERC721BridgeImpl is ERC721HolderUpgradeable, AccessControlUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable {
 
     bytes32 public OPERATOR;
     bytes32 public BRIDGE;
