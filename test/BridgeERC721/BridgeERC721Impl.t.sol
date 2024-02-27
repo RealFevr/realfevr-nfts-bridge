@@ -41,7 +41,7 @@ contract BridgeERC721_test is BaseTest {
     // nft
     event NFTDeposited(address indexed contractAddress, address owner, uint256 tokenId, uint256 fee, uint targetChainId);
     event NFTWithdrawn(address indexed contractAddress, address owner, uint256 tokenId, string uniqueKey);
-    event NFTDetailsSet(bool isActive, address nftContractAddress, address feeTokenAddress, uint feeAmount);
+    event NFTDetailsSet(bool isActive, address nftContractAddress, address feeTokenAddress, uint feeAmount, uint withdrawFeeAmount);
     event ERC721Minted(address indexed nftAddress, address indexed to, uint256 tokenId, string uniqueKey);
     // tokens
     event ERC20DetailsSet(bool isActive, address erc20ContractAddress);
@@ -208,7 +208,7 @@ contract BridgeERC721_test is BaseTest {
         bridgeERC721.setNFTDetails(isActive, nftContractAddress, feeTokenAddress, depositFeeAmount, withdrawFeeAmount);
 
         vm.expectEmit(address(bridgeERC721));
-        emit NFTDetailsSet(isActive, nftContractAddress, feeTokenAddress, depositFeeAmount);
+        emit NFTDetailsSet(isActive, nftContractAddress, feeTokenAddress, depositFeeAmount, withdrawFeeAmount);
         vm.prank(operator);
         bridgeERC721.setNFTDetails(isActive, nftContractAddress, feeTokenAddress, depositFeeAmount, withdrawFeeAmount);
 

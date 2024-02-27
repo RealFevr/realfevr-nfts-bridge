@@ -13,6 +13,12 @@ contract base_erc721 is ERC721, Ownable {
         uint16[] marketplaceDistributionRates;
         address[] marketplaceDistributionAddresses;
     }
+    event MarketplaceDistributionSet(
+        uint256 indexed tokenId,
+        uint16[] marketplaceDistributionRates,
+        address[] marketplaceDistributionAddresses
+    );
+    event BaseURISet(string baseURI);
 
     // -----------------------------------------------------------------------------
 
@@ -30,6 +36,7 @@ contract base_erc721 is ERC721, Ownable {
 
     function setBaseURI(string memory baseURI_) public onlyOwner {
         baseURI = baseURI_;
+        emit BaseURISet(baseURI);
     }
 
     function setMarketplaceDistributions(
@@ -42,6 +49,11 @@ contract base_erc721 is ERC721, Ownable {
             "MarketplaceDistribution: Rates and Addresses length mismatch"
         );
         marketplaceDistributions[_tokenId] = MarketplaceDistribution(
+            _marketplaceDistributionRates,
+            _marketplaceDistributionAddresses
+        );
+        emit MarketplaceDistributionSet(
+            _tokenId,
             _marketplaceDistributionRates,
             _marketplaceDistributionAddresses
         );

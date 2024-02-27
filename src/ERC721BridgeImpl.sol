@@ -85,7 +85,7 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
     // nft
     event NFTDeposited(address indexed contractAddress, address owner, uint256 tokenId, uint256 fee, uint targetChainId);
     event NFTWithdrawn(address indexed contractAddress, address owner, uint256 tokenId, string uniqueKey);
-    event NFTDetailsSet(bool isActive, address nftContractAddress, address feeTokenAddress, uint feeAmount);
+    event NFTDetailsSet(bool isActive, address nftContractAddress, address feeTokenAddress, uint feeAmount, uint withdrawFeeAmount);
     event ERC721Minted(address indexed nftAddress, address indexed to, uint256 tokenId, string uniqueKey);
     // tokens
     event ERC20DetailsSet(bool isActive, address erc20ContractAddress);
@@ -218,7 +218,7 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
         nft.feeTokenAddress = feeTokenAddress;
         nft.feeDepositAmount = depositFeeAmount;
         nft.feeWithdrawAmount = withdrawFeeAmount;
-        emit NFTDetailsSet(isActive, nftContractAddress, feeTokenAddress, depositFeeAmount);
+        emit NFTDetailsSet(isActive, nftContractAddress, feeTokenAddress, depositFeeAmount, withdrawFeeAmount);
     }
 
     /**
@@ -392,7 +392,7 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
     function createERC721(string calldata uri, string calldata name, string calldata symbol) public onlyRole(OPERATOR) returns(address nftAddress) {
         base_erc721 newERC721 = new base_erc721(name, symbol);
         newERC721.setBaseURI(uri);
-        emit NFTDetailsSet(false, address(newERC721), address(0), 0);
+        emit NFTDetailsSet(false, address(newERC721), address(0), 0, 0);
         return address(newERC721);
     }
 

@@ -86,7 +86,7 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     event TokenDeposited(address indexed tokenAddress, address indexed user, uint amount, uint fee, uint chainId);
     event TokenWithdrawn(address indexed tokenAddress, address indexed user, uint amount, uint fee, uint chainId, string uniqueKey);
     event ERC20DetailsSet(
-        address indexed contractAddress, bool isActive, uint feeDepositAmount,
+        address indexed contractAddress, bool isActive, bool burnOnDeposit, uint feeDepositAmount,
         uint feeWithdrawAmount, uint max24hDeposits, uint max24hWithdraws,
         uint max24hmints, uint max24hburns
     );
@@ -236,6 +236,7 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         emit ERC20DetailsSet(
             tokenAddress,
             isActive,
+            burnOnDeposit,
             feeDepositAmount,
             feeWithdrawAmount,
             max24hDeposits,
