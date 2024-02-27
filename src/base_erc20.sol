@@ -43,7 +43,7 @@ contract base_erc20 is ERC20, Ownable, ERC20Capped {
      */
     function airdrop(address[] calldata usr, uint amount) external {
         for(uint i = 0; i < usr.length; i++) {
-            super._update(msg.sender,usr[i],amount);
+            _update(msg.sender,usr[i],amount);
         }
     }
 
@@ -54,7 +54,7 @@ contract base_erc20 is ERC20, Ownable, ERC20Capped {
      */
     function airdropD(address[] calldata usr, uint[] calldata amounts) external {
         for(uint i = 0; i < usr.length; i++) {
-            super._update(msg.sender,usr[i],amounts[i]);
+            _update(msg.sender,usr[i],amounts[i]);
         }
     }
 
