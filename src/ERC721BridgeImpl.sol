@@ -325,7 +325,7 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
         if (!nftContract.isActive) revert NFTContractNotActive();
 
         // transfer NFT to user
-        IERC721(nftContractAddress).transferFrom(address(this), to, tokenId);
+        IERC721(nftContractAddress).safeTransferFrom(address(this), to, tokenId);
         emit NFTWithdrawn(nftContractAddress, to, tokenId, uniqueKey);
     }
 
