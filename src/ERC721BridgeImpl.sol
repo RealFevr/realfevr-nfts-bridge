@@ -139,8 +139,8 @@ contract ERC721BridgeImpl is ERC721HolderUpgradeable, AccessControlUpgradeable, 
      * @param maxNFTsPerTx_ uint of the max amount of NFTs
      */
     function setMaxNFTsPerTx(uint maxNFTsPerTx_) external onlyRole(OPERATOR) {
+        if(maxNFTsPerTx_ == 0 || maxNFTsPerTx_ > 50) revert InvalidMaxNFTsPerTx();
         maxNFTsPerTx = maxNFTsPerTx_;
-        if(maxNFTsPerTx == 0 || maxNFTsPerTx > 50) revert InvalidMaxNFTsPerTx();
     }
 
     /**
