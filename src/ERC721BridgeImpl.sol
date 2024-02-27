@@ -67,7 +67,6 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
     error NoNFTsToWithdraw();                       // when the user tries to withdraw 0 NFTs
     error TooManyNFTsToWithdraw(uint maxNFTsPerTx); // when the user tries to withdraw more than the max amount of NFTs per tx
     error NFTContractNotActive();                   // when the NFT contract is not active
-    error NFTNotUnlocked();                         // when the NFT is not unlocked
     // tokens
     error ERC20ContractNotActive();                 // when the ERC20 contract is not active
     error ERC20TransferError();                     // when the ERC20 transfer fails
@@ -287,10 +286,14 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
     }
 
     function depositMultipleERC721(address[] calldata nftAddress, uint[] calldata tokenIds, uint targetChainId) external payable nonReentrant {
-            // check if user has enough ETH to pay for the bridge
-            uint _ethFeeAmount = ethDepositFee[targetChainId].amount;
-            uint _nftLength = nftAddress.length;
-            if(msg.value != _ethFeeAmount * _nftLength) revert InsufficentETHAmountForFee(_ethFeeAmount * _nftLength);
+        // check if user has enough ETH to pay for the bridge
+        uint _ethFeeAmount = ethDepositFee[targetChainId].amount;
+        uint _nftLength = nftAddress.length;
+        if(msg.value != _ethFeeAmount * _nftLength) revert InsufficentETHAmountForFee(_ethFeeAmount * _nftLength);
+
+        if(tokenIds.length == 0) revert NoNFTsToDeposit();
+        if(tokenIds.length > maxNFTsPerTx) revert TooManyNFTsToDeposit(tokenIds.length);
+
         // we handle fees here
         _multiDeposit = true;
         (bool success,) = feeReceiver.call{value: msg.value}("");
@@ -334,6 +337,10 @@ contract ERC721BridgeImpl is ERC721Holder, AccessControlUpgradeable, ReentrancyG
      * @param tokenIds uint[] of the NFT ids
      */
     function withdrawMultipleERC721(address to, address contractAddress, uint[] memory tokenIds, string[] calldata uniqueKeys) external onlyRole(BRIDGE) {
+        
+        if(tokenIds.length == 0) revert NoNFTsToWithdraw();
+        if(tokenIds.length > maxNFTsPerTx) revert TooManyNFTsToWithdraw(tokenIds.length);
+
         for(uint i = 0; i < tokenIds.length; i++) {
             withdrawSingleERC721(to, contractAddress, tokenIds[i], uniqueKeys[i]);
         }
