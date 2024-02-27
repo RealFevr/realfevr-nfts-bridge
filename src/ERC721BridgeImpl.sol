@@ -276,7 +276,7 @@ contract ERC721BridgeImpl is ERC721HolderUpgradeable, AccessControlUpgradeable, 
         address feeTokenAddress = nftContract.feeTokenAddress;
         // if Fees are active, we add the fee to the bridge cost
         if (feeActive && feeAmount > 0) {
-            bridgeCost = takeFees(feeTokenAddress, feeAmount, 1);
+            bridgeCost = takeFees(feeTokenAddress, feeAmount);
         }
         
         // transfer NFT to contract
@@ -350,23 +350,21 @@ contract ERC721BridgeImpl is ERC721HolderUpgradeable, AccessControlUpgradeable, 
      * @notice take fees from the user
      * @param feeTokenAddress address of the token to take fees in
      * @param fees amount of fees to take
-     * @param quantity number of NFTs to bridge
      * @return uint of the total cost of the bridge
      */
-    function takeFees(address feeTokenAddress, uint fees, uint quantity) private returns (uint) {
-        uint bridgeCost = fees * quantity;
-        if (IERC20(feeTokenAddress).balanceOf(msg.sender) < bridgeCost) {
+    function takeFees(address feeTokenAddress, uint fees) private returns (uint) {
+        if (IERC20(feeTokenAddress).balanceOf(msg.sender) < fees) {
             revert FeeTokenInsufficentBalance();
         }
-        if (IERC20(feeTokenAddress).allowance(msg.sender, address(this)) < bridgeCost) {
-            revert FeeTokenNotApproved(feeTokenAddress, bridgeCost);
+        if (IERC20(feeTokenAddress).allowance(msg.sender, address(this)) < fees) {
+            revert FeeTokenNotApproved(feeTokenAddress, fees);
         }
-        bool success = IERC20(feeTokenAddress).transferFrom(msg.sender, feeReceiver, bridgeCost);
-        emit TokenFeeCollected(feeTokenAddress, bridgeCost);
+        bool success = IERC20(feeTokenAddress).transferFrom(msg.sender, feeReceiver, fees);
+        emit TokenFeeCollected(feeTokenAddress, fees);
         if (!success) {
             revert ERC20TransferError();
         }
-        return bridgeCost;
+        return fees;
     }
 
     /**
