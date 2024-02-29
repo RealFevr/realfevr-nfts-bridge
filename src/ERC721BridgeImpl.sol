@@ -45,7 +45,6 @@ contract ERC721BridgeImpl is ERC721HolderUpgradeable, AccessControlUpgradeable, 
         address contractAddress;
         address feeTokenAddress;
         uint feeDepositAmount;
-        uint feeWithdrawAmount;
     }
 
     struct NFT {
@@ -77,7 +76,7 @@ contract ERC721BridgeImpl is ERC721HolderUpgradeable, AccessControlUpgradeable, 
     event BridgeFeesPaused(bool active);
     error ChainNotSupported();                      // when the chain id is not supported
     // fees
-    event FeesSet(bool active, address indexed nftAddress, address indexed tokenAddress, uint depositFee, uint withdrawFee);
+    event FeesSet(bool active, address indexed nftAddress, address indexed tokenAddress, uint depositFee);
     event FeeReceiverSet(address receiver);
     event ETHFeeSet(uint chainId, bool active, uint amount);
     event TokenFeeCollected(address indexed tokenAddress, uint amount);
@@ -85,7 +84,7 @@ contract ERC721BridgeImpl is ERC721HolderUpgradeable, AccessControlUpgradeable, 
     // nft
     event NFTDeposited(address indexed contractAddress, address owner, uint256 tokenId, uint256 fee, uint targetChainId);
     event NFTWithdrawn(address indexed contractAddress, address owner, uint256 tokenId, string uniqueKey);
-    event NFTDetailsSet(bool isActive, address nftContractAddress, address feeTokenAddress, uint feeAmount, uint withdrawFeeAmount);
+    event NFTDetailsSet(bool isActive, address nftContractAddress, address feeTokenAddress, uint feeAmount);
     event ERC721Minted(address indexed nftAddress, address indexed to, uint256 tokenId, string uniqueKey);
     // tokens
     event ERC20DetailsSet(bool isActive, address erc20ContractAddress);
@@ -182,14 +181,12 @@ contract ERC721BridgeImpl is ERC721HolderUpgradeable, AccessControlUpgradeable, 
      * @param active bool to activate or deactivate the fees
      * @param nftAddress address of the NFT Token
      * @param depositFee uint to set the deposit fee for the bridge
-     * @param withdrawFee uint to set the withdraw fee for the bridge
      */
-    function setTokenFees(bool active, address nftAddress, uint depositFee, uint withdrawFee) external onlyRole(OPERATOR) {
+    function setTokenFees(bool active, address nftAddress, uint depositFee) external onlyRole(OPERATOR) {
         NFTContracts storage nft = permittedNFTs[nftAddress];
         nft.isActive = active;
         nft.feeDepositAmount = depositFee;
-        nft.feeWithdrawAmount = withdrawFee;
-        emit FeesSet(active, nftAddress, nft.feeTokenAddress, depositFee, withdrawFee);
+        emit FeesSet(active, nftAddress, nft.feeTokenAddress, depositFee);
     }
 
     /**
@@ -209,16 +206,14 @@ contract ERC721BridgeImpl is ERC721HolderUpgradeable, AccessControlUpgradeable, 
      * @param nftContractAddress address of the NFT contract
      * @param feeTokenAddress address of the token to pay the fee
      * @param depositFeeAmount uint of the deposit fee amount
-     * @param withdrawFeeAmount uint of the withdraw fee amount
      */
-    function setNFTDetails(bool isActive, address nftContractAddress, address feeTokenAddress, uint depositFeeAmount, uint withdrawFeeAmount) external onlyRole(OPERATOR) {
+    function setNFTDetails(bool isActive, address nftContractAddress, address feeTokenAddress, uint depositFeeAmount) external onlyRole(OPERATOR) {
         NFTContracts storage nft = permittedNFTs[nftContractAddress];
         nft.isActive = isActive;
         nft.contractAddress = nftContractAddress;
         nft.feeTokenAddress = feeTokenAddress;
         nft.feeDepositAmount = depositFeeAmount;
-        nft.feeWithdrawAmount = withdrawFeeAmount;
-        emit NFTDetailsSet(isActive, nftContractAddress, feeTokenAddress, depositFeeAmount, withdrawFeeAmount);
+        emit NFTDetailsSet(isActive, nftContractAddress, feeTokenAddress, depositFeeAmount);
     }
 
     /**
@@ -390,7 +385,7 @@ contract ERC721BridgeImpl is ERC721HolderUpgradeable, AccessControlUpgradeable, 
     function createERC721(string calldata uri, string calldata name, string calldata symbol) public onlyRole(OPERATOR) returns(address nftAddress) {
         base_erc721 newERC721 = new base_erc721(name, symbol);
         newERC721.setBaseURI(uri);
-        emit NFTDetailsSet(false, address(newERC721), address(0), 0, 0);
+        emit NFTDetailsSet(false, address(newERC721), address(0), 0);
         return address(newERC721);
     }
 

@@ -70,14 +70,12 @@ contract Base is Script {
         address nftAddress        = address(nft);     // the address of the NFT contract
         address feeTokenAddress   = address(token);   // the address of the token used for fees
         uint    depositFeeAmount  = 1000 ether;       // the amount of fees to be paid for depositing an NFT
-        uint    withdrawFeeAmount = 1000 ether;       // the amount of fees to be paid for withdrawing an NFT
 
         bridge.setNFTDetails({
             isActive: isActive,
             nftContractAddress: nftAddress,
             feeTokenAddress: feeTokenAddress,
-            depositFeeAmount: depositFeeAmount,
-            withdrawFeeAmount: withdrawFeeAmount
+            depositFeeAmount: depositFeeAmount
         });
     }
 

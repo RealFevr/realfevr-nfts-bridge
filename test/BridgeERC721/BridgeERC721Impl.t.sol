@@ -22,7 +22,6 @@ contract BridgeERC721_test is BaseTest {
         address contractAddress;
         address feeTokenAddress;
         uint feeDepositAmount;
-        uint feeWithdrawAmount;
     }
 
     struct NFT {
@@ -33,7 +32,7 @@ contract BridgeERC721_test is BaseTest {
     event BridgeFeesPaused(bool active);
     error ChainNotSupported();                      // when the chain id is not supported
     // fees
-    event FeesSet(bool active, address indexed nftAddress, address indexed tokenAddress, uint depositFee, uint withdrawFee);
+    event FeesSet(bool active, address indexed nftAddress, address indexed tokenAddress, uint depositFee);
     event FeeReceiverSet(address receiver);
     event ETHFeeSet(uint chainId, bool active, uint amount);
     event TokenFeeCollected(address indexed tokenAddress, uint amount);
@@ -41,7 +40,7 @@ contract BridgeERC721_test is BaseTest {
     // nft
     event NFTDeposited(address indexed contractAddress, address owner, uint256 tokenId, uint256 fee, uint targetChainId);
     event NFTWithdrawn(address indexed contractAddress, address owner, uint256 tokenId, string uniqueKey);
-    event NFTDetailsSet(bool isActive, address nftContractAddress, address feeTokenAddress, uint feeAmount, uint withdrawFeeAmount);
+    event NFTDetailsSet(bool isActive, address nftContractAddress, address feeTokenAddress, uint feeAmount);
     event ERC721Minted(address indexed nftAddress, address indexed to, uint256 tokenId, string uniqueKey);
     // tokens
     event ERC20DetailsSet(bool isActive, address erc20ContractAddress);
@@ -159,28 +158,26 @@ contract BridgeERC721_test is BaseTest {
         assertEq(fee, amount);
     }
 
-    function test_setTokenFees(bool active, address nftAddress, uint depositFee, uint withdrawFee) public {
+    function test_setTokenFees(bool active, address nftAddress, uint depositFee) public {
         // only operator can call this
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), OPERATOR_ROLE));
-        bridgeERC721.setTokenFees(active, nftAddress, depositFee, withdrawFee);
+        bridgeERC721.setTokenFees(active, nftAddress, depositFee);
 
         vm.expectEmit(address(bridgeERC721));
-        emit FeesSet(active, nftAddress, address(0), depositFee, withdrawFee);
+        emit FeesSet(active, nftAddress, address(0), depositFee);
         vm.prank(operator);
-        bridgeERC721.setTokenFees(active, nftAddress, depositFee, withdrawFee);
+        bridgeERC721.setTokenFees(active, nftAddress, depositFee);
 
         (
             bool isActive,
             address contractAddress,
             address feeTokenAddress,
-            uint feeDepositAmount,
-            uint feeWithdrawAmount
+            uint feeDepositAmount
         ) = bridgeERC721.permittedNFTs(nftAddress);
         assertEq(isActive, active);
         assertEq(contractAddress, address(0));
         assertEq(feeTokenAddress, address(0));
         assertEq(feeDepositAmount, depositFee);
-        assertEq(feeWithdrawAmount, withdrawFee);
     }
 
     function test_setFeeReceiver(address receiver) public {
@@ -200,30 +197,27 @@ contract BridgeERC721_test is BaseTest {
         bool isActive,
         address nftContractAddress,
         address feeTokenAddress,
-        uint depositFeeAmount,
-        uint withdrawFeeAmount) public {
+        uint depositFeeAmount) public {
         
         // only operator can call this
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), OPERATOR_ROLE));
-        bridgeERC721.setNFTDetails(isActive, nftContractAddress, feeTokenAddress, depositFeeAmount, withdrawFeeAmount);
+        bridgeERC721.setNFTDetails(isActive, nftContractAddress, feeTokenAddress, depositFeeAmount);
 
         vm.expectEmit(address(bridgeERC721));
-        emit NFTDetailsSet(isActive, nftContractAddress, feeTokenAddress, depositFeeAmount, withdrawFeeAmount);
+        emit NFTDetailsSet(isActive, nftContractAddress, feeTokenAddress, depositFeeAmount);
         vm.prank(operator);
-        bridgeERC721.setNFTDetails(isActive, nftContractAddress, feeTokenAddress, depositFeeAmount, withdrawFeeAmount);
+        bridgeERC721.setNFTDetails(isActive, nftContractAddress, feeTokenAddress, depositFeeAmount);
 
         (
             bool _isActive,
             address contractAddress,
             address _feeTokenAddress,
-            uint feeDepositAmount,
-            uint feeWithdrawAmount
+            uint feeDepositAmount
         ) = bridgeERC721.permittedNFTs(nftContractAddress);
         assertEq(_isActive, isActive);
         assertEq(contractAddress, nftContractAddress);
         assertEq(_feeTokenAddress, feeTokenAddress);
         assertEq(feeDepositAmount, depositFeeAmount);
-        assertEq(feeWithdrawAmount, withdrawFeeAmount);
     }
 
     function test_setERC20Details(bool isActive, address erc20ContractAddress) public {
@@ -244,9 +238,8 @@ contract BridgeERC721_test is BaseTest {
         assertEq(contractAddress, erc20ContractAddress);
     }
 
-    function test_depositSingleERC721(uint tokenId, uint targetChainId, uint depositFee, uint withdrawFee, bool feeActive) public {
+    function test_depositSingleERC721(uint tokenId, uint targetChainId, uint depositFee, bool feeActive) public {
         depositFee = bound(depositFee, 0, 1000 ether);
-        withdrawFee = bound(withdrawFee, 0, 1000 ether);
 
         // create new ERC20 token
         token = new base_erc20(
@@ -269,7 +262,7 @@ contract BridgeERC721_test is BaseTest {
         bridgeERC721.depositSingleERC721(nftAddress, tokenId, targetChainId);
 
         vm.prank(operator);
-        bridgeERC721.setNFTDetails(true, nftAddress, address(token), depositFee, withdrawFee);
+        bridgeERC721.setNFTDetails(true, nftAddress, address(token), depositFee);
     // ERC20 token must be allowed to use bridge
         vm.expectRevert(ERC721BridgeImpl.ERC20ContractNotActive.selector);
         bridgeERC721.depositSingleERC721(nftAddress, tokenId, targetChainId);
@@ -301,7 +294,7 @@ contract BridgeERC721_test is BaseTest {
         vm.startPrank(operator);
         bridgeERC721.setETHFee(targetChainId, feeActive, depositFee);
         bridgeERC721.setFeeStatus(feeActive);
-        bridgeERC721.setTokenFees(true, nftAddress, depositFee, withdrawFee);
+        bridgeERC721.setTokenFees(true, nftAddress, depositFee);
         vm.stopPrank();
         
 
@@ -372,7 +365,7 @@ contract BridgeERC721_test is BaseTest {
         bridgeERC721.setBridgeStatus(true);
 
         // enable nft contract
-        bridgeERC721.setNFTDetails(true, nftAddress1, address(token), 0, 0);
+        bridgeERC721.setNFTDetails(true, nftAddress1, address(token), 0);
         // enable erc20 contract
         bridgeERC721.setERC20Details(true, address(token));
 
@@ -422,7 +415,7 @@ contract BridgeERC721_test is BaseTest {
         uint _ethFee = 0.01 ether;
         bridgeERC721.setETHFee(targetChainId, true, _ethFee);
         // enable nft contract
-        bridgeERC721.setNFTDetails(true, nftAddress1, address(token), 0, 0);
+        bridgeERC721.setNFTDetails(true, nftAddress1, address(token), 0);
         // enable erc20 contract
         bridgeERC721.setERC20Details(true, address(token));
 
@@ -478,7 +471,7 @@ contract BridgeERC721_test is BaseTest {
         bridgeERC721.withdrawSingleERC721(user1, nftAddress, tokenId, "test1");
 
         vm.prank(operator);
-        bridgeERC721.setNFTDetails(true, nftAddress, address(token), 0, 0);
+        bridgeERC721.setNFTDetails(true, nftAddress, address(token), 0);
 
     // withdraw NFT
         uint16[] memory _marketplaceDistributionRates = new uint16[](1);
@@ -509,7 +502,7 @@ contract BridgeERC721_test is BaseTest {
         bridgeERC721.setBridgeStatus(true);
         // enable nft contract
         vm.prank(operator);
-        bridgeERC721.setNFTDetails(true, nftAddress, address(token), 0, 0);
+        bridgeERC721.setNFTDetails(true, nftAddress, address(token), 0);
 
         // mint 2 NFTs to the bridge
         uint16[] memory _marketplaceDistributionRates = new uint16[](1);
@@ -543,7 +536,7 @@ contract BridgeERC721_test is BaseTest {
         bridgeERC721.setBridgeStatus(true);
         // enable nft contract
         vm.prank(operator);
-        bridgeERC721.setNFTDetails(true, nftAddress, address(token), 0, 0);
+        bridgeERC721.setNFTDetails(true, nftAddress, address(token), 0);
 
         // get the deposit fee address and amount
         (address feeTokenAddress, uint feeAmount) = bridgeERC721.getDepositFeeAddressAndAmount(nftAddress);

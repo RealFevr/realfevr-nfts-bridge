@@ -44,7 +44,7 @@ better never write anything in those parts of the contract if they are implement
 
 ERB-03 | Unused State Variables
 comment: maxNFTsPerTx is used 15 times in the code, 2 times in the core logic.
-partially pending
+✅
 
 RFH-02 | Inconsistency Between safeMint() and safeMintTo() Use of lastMintedId
 ✅
