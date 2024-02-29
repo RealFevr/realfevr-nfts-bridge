@@ -1,18 +1,11 @@
 # base_erc721
-[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/37cd7fa929a344934951d0ced8e23240aacbf261/src\base_erc721.sol)
+[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/087f6b3facb11b27f9b780abe00b57b13e133579/src\base_erc721.sol)
 
 **Inherits:**
 ERC721, Ownable
 
 
 ## State Variables
-### lastMintedId
-
-```solidity
-uint256 public lastMintedId;
-```
-
-
 ### baseURI
 
 ```solidity
@@ -33,13 +26,6 @@ mapping(uint256 => MarketplaceDistribution) marketplaceDistributions;
 
 ```solidity
 constructor(string memory name, string memory symbol) ERC721(name, symbol) Ownable(msg.sender);
-```
-
-### safeMint
-
-
-```solidity
-function safeMint(address to) public onlyOwner;
 ```
 
 ### safeMintTo
@@ -82,6 +68,21 @@ function getMarketplaceDistributionForERC721(uint256 _tokenId)
     external
     view
     returns (uint16[] memory, address[] memory);
+```
+
+## Events
+### MarketplaceDistributionSet
+
+```solidity
+event MarketplaceDistributionSet(
+    uint256 indexed tokenId, uint16[] marketplaceDistributionRates, address[] marketplaceDistributionAddresses
+);
+```
+
+### BaseURISet
+
+```solidity
+event BaseURISet(string baseURI);
 ```
 
 ## Structs

@@ -1,8 +1,8 @@
 # ERC721BridgeImpl
-[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/37cd7fa929a344934951d0ced8e23240aacbf261/src\ERC721BridgeImpl.sol)
+[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/087f6b3facb11b27f9b780abe00b57b13e133579/src\ERC721BridgeImpl.sol)
 
 **Inherits:**
-ERC721Holder, AccessControlUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable
+ERC721HolderUpgradeable, AccessControlUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable
 
 **Author:**
 Krakovia - t.me/karola96
@@ -71,13 +71,6 @@ mapping(address => NFTContracts) public permittedNFTs;
 
 ```solidity
 mapping(address => ERC20Tokens) public permittedERC20s;
-```
-
-
-### nftListPerContract
-
-```solidity
-mapping(address => mapping(uint256 => NFT)) public nftListPerContract;
 ```
 
 
@@ -195,7 +188,7 @@ function setBridgeStatus(bool active) external onlyRole(OPERATOR);
 
 ### setFeeStatus
 
-set the bridge fee statys
+set the bridge fee status
 
 *only operator can call this*
 
@@ -207,7 +200,7 @@ function setFeeStatus(bool active) external onlyRole(OPERATOR);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`active`|`bool`|bool to activate or deactivate the bridge|
+|`active`|`bool`|bool to activate or deactivate the bridge fee|
 
 
 ### setETHFee
@@ -237,9 +230,7 @@ set the fees for the ERC20 tokens
 
 
 ```solidity
-function setTokenFees(bool active, address nftAddress, uint256 depositFee, uint256 withdrawFee)
-    external
-    onlyRole(OPERATOR);
+function setTokenFees(bool active, address nftAddress, uint256 depositFee) external onlyRole(OPERATOR);
 ```
 **Parameters**
 
@@ -248,7 +239,6 @@ function setTokenFees(bool active, address nftAddress, uint256 depositFee, uint2
 |`active`|`bool`|bool to activate or deactivate the fees|
 |`nftAddress`|`address`|address of the NFT Token|
 |`depositFee`|`uint256`|uint to set the deposit fee for the bridge|
-|`withdrawFee`|`uint256`|uint to set the withdraw fee for the bridge|
 
 
 ### setFeeReceiver
@@ -276,13 +266,9 @@ set the settings of an NFT address
 
 
 ```solidity
-function setNFTDetails(
-    bool isActive,
-    address nftContractAddress,
-    address feeTokenAddress,
-    uint256 depositFeeAmount,
-    uint256 withdrawFeeAmount
-) external onlyRole(OPERATOR);
+function setNFTDetails(bool isActive, address nftContractAddress, address feeTokenAddress, uint256 depositFeeAmount)
+    external
+    onlyRole(OPERATOR);
 ```
 **Parameters**
 
@@ -292,7 +278,6 @@ function setNFTDetails(
 |`nftContractAddress`|`address`|address of the NFT contract|
 |`feeTokenAddress`|`address`|address of the token to pay the fee|
 |`depositFeeAmount`|`uint256`|uint of the deposit fee amount|
-|`withdrawFeeAmount`|`uint256`|uint of the withdraw fee amount|
 
 
 ### setERC20Details
@@ -393,7 +378,7 @@ take fees from the user
 
 
 ```solidity
-function takeFees(address feeTokenAddress, uint256 fees, uint256 quantity) private returns (uint256);
+function takeFees(address feeTokenAddress, uint256 fees) private returns (uint256);
 ```
 **Parameters**
 
@@ -401,7 +386,6 @@ function takeFees(address feeTokenAddress, uint256 fees, uint256 quantity) priva
 |----|----|-----------|
 |`feeTokenAddress`|`address`|address of the token to take fees in|
 |`fees`|`uint256`|amount of fees to take|
-|`quantity`|`uint256`|number of NFTs to bridge|
 
 **Returns**
 
@@ -564,9 +548,7 @@ event BridgeFeesPaused(bool active);
 ### FeesSet
 
 ```solidity
-event FeesSet(
-    bool active, address indexed nftAddress, address indexed tokenAddress, uint256 depositFee, uint256 withdrawFee
-);
+event FeesSet(bool active, address indexed nftAddress, address indexed tokenAddress, uint256 depositFee);
 ```
 
 ### FeeReceiverSet
@@ -696,12 +678,6 @@ error TooManyNFTsToWithdraw(uint256 maxNFTsPerTx);
 error NFTContractNotActive();
 ```
 
-### NFTNotUnlocked
-
-```solidity
-error NFTNotUnlocked();
-```
-
 ### ERC20ContractNotActive
 
 ```solidity
@@ -753,7 +729,6 @@ struct NFTContracts {
     address contractAddress;
     address feeTokenAddress;
     uint256 feeDepositAmount;
-    uint256 feeWithdrawAmount;
 }
 ```
 

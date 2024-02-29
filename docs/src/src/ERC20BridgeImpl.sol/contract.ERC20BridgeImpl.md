@@ -1,5 +1,5 @@
 # ERC20BridgeImpl
-[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/37cd7fa929a344934951d0ced8e23240aacbf261/src\ERC20BridgeImpl.sol)
+[Git Source](https://github.com/RealFevr/realfevr-nfts-bridge/blob/087f6b3facb11b27f9b780abe00b57b13e133579/src\ERC20BridgeImpl.sol)
 
 **Inherits:**
 AccessControlUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable
@@ -71,13 +71,6 @@ mapping(address tokenAddress => mapping(uint256 day => uint256 mintAmount)) publ
 
 ```solidity
 mapping(address tokenAddress => mapping(uint256 day => uint256 burnAmount)) public dailyBurns;
-```
-
-
-### userData
-
-```solidity
-mapping(address user => mapping(address tokenAddress => UserData)) public userData;
 ```
 
 
@@ -195,7 +188,7 @@ function setBridgeStatus(bool active) external onlyRole(OPERATOR);
 
 ### setFeeStatus
 
-set the bridge fee statys
+set the bridge fee status
 
 *only operator can call this*
 
@@ -207,7 +200,7 @@ function setFeeStatus(bool active) external onlyRole(OPERATOR);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`active`|`bool`|bool to activate or deactivate the bridge|
+|`active`|`bool`|bool to activate or deactivate the bridge fees|
 
 
 ### setETHFee
@@ -508,6 +501,7 @@ event TokenWithdrawn(
 event ERC20DetailsSet(
     address indexed contractAddress,
     bool isActive,
+    bool burnOnDeposit,
     uint256 feeDepositAmount,
     uint256 feeWithdrawAmount,
     uint256 max24hDeposits,
@@ -615,14 +609,6 @@ error ETHTransferError();
 struct ChainETHFee {
     bool isActive;
     uint256 amount;
-}
-```
-
-### UserData
-
-```solidity
-struct UserData {
-    uint256 depositAmount;
 }
 ```
 
