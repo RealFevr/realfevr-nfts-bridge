@@ -295,7 +295,9 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
         }
 
         // set daily deposit amount
-        dailyDeposits[tokenAddress][currentDay] += amount;
+        if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
+            dailyDeposits[tokenAddress][currentDay] += amount;
+        }
         IERC20 _token = IERC20(tokenAddress);
 
         // transfer tokens to bridge
@@ -344,6 +346,11 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
             if(feeAmount != 0) {
                 amount -= feeAmount;
             }
+        }
+
+        // set daily withdrawal amount
+        if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
+            dailyWithdraws[tokenAddress][currentDay] += amount;
         }
 
         // transfer fees to feeReceiver
