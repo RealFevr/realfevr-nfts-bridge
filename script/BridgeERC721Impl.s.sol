@@ -187,7 +187,7 @@ contract DepositInBridgeERC721Impl is Base {
         _nft.setApprovalForAll(address(_bridge), true);
 
         // mint an nft
-        _nft.safeMint(deployerAddress);
+        _nft.safeMintTo(deployerAddress, 0);
 
         // deposit the nft
         _bridge.depositSingleERC721{value: ethDepositFeeAmount}(address(_nft), 0, block.chainid);

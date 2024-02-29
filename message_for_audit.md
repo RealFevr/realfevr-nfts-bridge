@@ -47,7 +47,7 @@ comment: maxNFTsPerTx is used 15 times in the code, 2 times in the core logic.
 partially pending
 
 RFH-02 | Inconsistency Between safeMint() and safeMintTo() Use of lastMintedId
-pending
+✅
 
 ERC-04 | Improper Handling of Daily Limits Between Deposit and Withdraw Actions
 pending

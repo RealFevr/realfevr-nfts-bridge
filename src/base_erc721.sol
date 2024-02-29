@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract base_erc721 is ERC721, Ownable {
-    uint public lastMintedId;
     string public baseURI;
     mapping (uint256 => MarketplaceDistribution) marketplaceDistributions;
 
@@ -24,14 +23,8 @@ contract base_erc721 is ERC721, Ownable {
 
     constructor(string memory name, string memory symbol) ERC721(name, symbol) Ownable(msg.sender) {}
 
-    function safeMint(address to) public onlyOwner {
-        uint256 tokenId = lastMintedId;
-        lastMintedId++;
-        _safeMint(to, tokenId);
-    }
     function safeMintTo(address to, uint tokenId) public onlyOwner {
         _safeMint(to, tokenId);
-        lastMintedId++;
     }
 
     function setBaseURI(string memory baseURI_) public onlyOwner {
