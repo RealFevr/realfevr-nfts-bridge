@@ -82,7 +82,6 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     event ETHFeeCollected(uint amount);
     event ChainSupportUpdated(uint chainId, bool status);
     // token events
-    event TokenEdited(address indexed tokenAddress, uint maxDeposit, uint maxWithdraw, uint max24hDeposits, uint max24hWithdraws);
     event TokenDeposited(address indexed tokenAddress, address indexed user, uint amount, uint fee, uint chainId);
     event TokenWithdrawn(address indexed tokenAddress, address indexed user, uint amount, uint fee, uint chainId, string uniqueKey);
     event ERC20DetailsSet(
@@ -394,7 +393,7 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     }
 
     function createNewToken(string memory _name, string memory _symbol, uint _totalSupply, uint8 _decimals) external returns(address) {
-        // only operator or bridge can call this
+        // only DEFAULT_ADMIN_ROLE or OPERATOR can call this
         if(!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(OPERATOR, msg.sender)) revert NotAuthorized();
         return(address(new base_erc20(_name, _symbol, _totalSupply, _decimals)));
     }
