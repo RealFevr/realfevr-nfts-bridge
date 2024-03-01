@@ -1,0 +1,8 @@
+/cache
+/artifacts
+.env
+/broadcast
+/coverage
+/out
+/lib
+/venv
