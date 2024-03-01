@@ -82,7 +82,6 @@ contract ERC20BridgeImpl is AccessControlUpgradeable, ReentrancyGuardUpgradeable
     event ETHFeeCollected(uint amount);
     event ChainSupportUpdated(uint chainId, bool status);
     // token events
-    event TokenEdited(address indexed tokenAddress, uint maxDeposit, uint maxWithdraw, uint max24hDeposits, uint max24hWithdraws);
     event TokenDeposited(address indexed tokenAddress, address indexed user, uint amount, uint fee, uint chainId);
     event TokenWithdrawn(address indexed tokenAddress, address indexed user, uint amount, uint fee, uint chainId, string uniqueKey);
     event ERC20DetailsSet(
